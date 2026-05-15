@@ -1,8 +1,10 @@
-# Tiepoint Picker Design Document
+# ANCHOR Design Document
 
 ## Project Goal
 
-Build a MATLAB tool for manually selecting tiepoints between two large, single-channel remote sensing images.
+Build ANCHOR, a MATLAB tool for manually selecting tiepoints between two large, single-channel remote sensing images.
+
+ANCHOR is the application name. The working expansion is **Aligned Navigation and Correspondence Helper for Orthorectification and Registration**. The name is meant to emphasize that manually selected points act as anchors between two image coordinate systems.
 
 The interface should use separate floating windows rather than one monolithic app window:
 
@@ -44,7 +46,7 @@ These are important future directions, but the first phase should prove the wind
 
 ```mermaid
 flowchart LR
-    App["TiePointPickerApp<br/>application controller"]
+    App["ANCHOR<br/>application controller"]
     Store["TiePointStore<br/>authoritative tiepoint model"]
     Table["TiePointTableWindow<br/>floating table/control window"]
     A["ImageViewWindow<br/>image A instance"]
@@ -71,12 +73,12 @@ The table window should feel like the main control surface, but it should not ow
 ## Proposed MATLAB Package Structure
 
 ```text
-tiepoint_picker/
+anchor/
   docs/
     design.md
   src/
-    +tiepoint/
-      TiePointPickerApp.m
+    +anchor/
+      ANCHOR.m
       TiePointStore.m
       TiePoint.m
       ImageSource.m
@@ -87,11 +89,11 @@ tiepoint_picker/
       SessionSerializer.m
 ```
 
-This package-style layout keeps public class names scoped under `tiepoint.*`, for example `tiepoint.TiePointPickerApp`.
+This package-style layout keeps public class names scoped under `anchor.*`, for example `anchor.ANCHOR`.
 
 ## Core Classes
 
-### `TiePointPickerApp`
+### `ANCHOR`
 
 Top-level coordinator. This class should be small and should not directly contain detailed UI layout code.
 
@@ -109,7 +111,7 @@ Responsibilities:
 Possible construction API:
 
 ```matlab
-app = tiepoint.TiePointPickerApp(imageA, imageB);
+app = anchor.ANCHOR(imageA, imageB);
 ```
 
 where `imageA` and `imageB` can initially be numeric matrices, then later file paths or richer image source objects.
@@ -405,10 +407,10 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 
 After manual control requirements are clearer, create a minimal class skeleton with:
 
-- `tiepoint.TiePointPickerApp`
-- `tiepoint.TiePointStore`
-- `tiepoint.ImageViewWindow`
-- `tiepoint.TiePointTableWindow`
-- `tiepoint.MatrixImageSource`
+- `anchor.ANCHOR`
+- `anchor.TiePointStore`
+- `anchor.ImageViewWindow`
+- `anchor.TiePointTableWindow`
+- `anchor.MatrixImageSource`
 
 The first runnable milestone should open three floating windows using synthetic images and allow creation, selection, and display of a small set of tiepoints.
