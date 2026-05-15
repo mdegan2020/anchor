@@ -72,6 +72,19 @@ classdef HomographyModel < handle
                 [min(mappedCorners(:, 2)), max(mappedCorners(:, 2))]);
         end
 
+        function residuals = computeResiduals(model, tiePoints)
+            if isempty(tiePoints) || height(tiePoints) == 0
+                residuals = zeros(0, 1);
+                return
+            end
+
+            pointsA = [tiePoints.A_X, tiePoints.A_Y];
+            pointsB = [tiePoints.B_X, tiePoints.B_Y];
+            mappedB = model.mapPoints(pointsA, "A", "B");
+            residualVectors = mappedB - pointsB;
+            residuals = sqrt(sum(residualVectors.^2, 2));
+        end
+
         function state = toSessionStruct(model)
             state = struct( ...
                 "AToB", model.AToB, ...

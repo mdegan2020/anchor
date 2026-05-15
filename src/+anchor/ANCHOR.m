@@ -116,6 +116,10 @@ classdef ANCHOR < handle
             data = app.TiePointStore.toTable();
         end
 
+        function data = getTiePointDisplayTable(app)
+            data = app.addTiePointDiagnostics(app.TiePointStore.toTable());
+        end
+
         function transformType = getTransformType(app)
             transformType = app.HomographyModel.TransformType;
         end
@@ -619,11 +623,20 @@ classdef ANCHOR < handle
 
         function refreshTiePointViews(app)
             tiePoints = app.TiePointStore.toTable();
+            displayTiePoints = app.addTiePointDiagnostics(tiePoints);
             activeId = app.TiePointStore.getActiveId();
 
-            app.TableWindow.setTiePoints(tiePoints, activeId);
+            app.TableWindow.setTiePoints(displayTiePoints, activeId);
             app.ImageWindowA.setTiePoints(tiePoints, activeId);
             app.ImageWindowB.setTiePoints(tiePoints, activeId);
+        end
+
+        function tiePoints = addTiePointDiagnostics(app, tiePoints)
+            tiePoints.DX = tiePoints.A_X - tiePoints.B_X;
+            tiePoints.DY = tiePoints.A_Y - tiePoints.B_Y;
+            tiePoints.Residual = app.HomographyModel.computeResiduals(tiePoints);
+            tiePoints = movevars(tiePoints, ["DX", "DY", "Residual"], ...
+                "Before", "Enabled");
         end
 
         function window = getImageWindow(app, imageRole)

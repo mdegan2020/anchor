@@ -189,6 +189,9 @@ Initial table columns:
 | `A_Y` | Yes | Full-resolution y coordinate in image A |
 | `B_X` | Yes | Full-resolution x coordinate in image B |
 | `B_Y` | Yes | Full-resolution y coordinate in image B |
+| `DX` | No | Derived `A_X - B_X` |
+| `DY` | No | Derived `A_Y - B_Y` |
+| `Residual` | No | Derived fit error against the current transform |
 | `Enabled` | Yes | Include/exclude point |
 | `Notes` | Yes | Optional comments |
 
@@ -562,6 +565,8 @@ Early tests should focus on non-UI behavior:
 - Enforcing complete-pair tiepoint creation.
 - Converting model data to a table.
 - Updating homography state after tiepoint edits.
+- Excluding disabled tiepoints from homography estimation.
+- Computing table diagnostics such as `DX`, `DY`, and residual fit error.
 - Mapping viewport centers/extents through the homography.
 - Writing CSV output with the expected schema, including `enabled` as `1` or `0`.
 - Computing local correlation shifts from synthetic translated patches.

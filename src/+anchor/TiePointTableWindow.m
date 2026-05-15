@@ -64,9 +64,9 @@ classdef TiePointTableWindow < handle
         function setTiePoints(window, tiePoints, activeId)
             window.Table.Data = anchor.TiePointTableWindow.formatTiePointTable(tiePoints);
             if height(tiePoints) == 0
-                window.Table.ColumnEditable = false(1, 7);
+                window.Table.ColumnEditable = false(1, 10);
             else
-                window.Table.ColumnEditable = [false true true true true true true];
+                window.Table.ColumnEditable = [false true true true true false false false true true];
             end
             window.DeleteButton.Enable = anchor.TiePointTableWindow.onOff(~isnan(activeId));
 
@@ -171,8 +171,8 @@ classdef TiePointTableWindow < handle
             window.Table.Layout.Row = 2;
             window.Table.Layout.Column = 1;
             window.Table.Data = anchor.TiePointTableWindow.emptyTiePointTable();
-            window.Table.ColumnEditable = false(1, 7);
-            window.Table.ColumnWidth = {70, 90, 90, 90, 90, 80, "auto"};
+            window.Table.ColumnEditable = false(1, 10);
+            window.Table.ColumnWidth = {70, 90, 90, 90, 90, 90, 90, 100, 80, "auto"};
             window.Table.CellSelectionCallback = @(~, event) window.handleCellSelection(event);
             window.Table.CellEditCallback = @(~, event) window.handleCellEdit(event);
         end
@@ -211,6 +211,11 @@ classdef TiePointTableWindow < handle
                 return
             end
             fieldName = fieldNames(columnIndex);
+
+            if any(fieldName == ["DX", "DY", "Residual"])
+                window.restoreEditedCell(rowIndex, fieldName, event.PreviousData);
+                return
+            end
 
             if any(fieldName == ["A_X", "A_Y", "B_X", "B_Y"])
                 value = str2double(string(event.NewData));
@@ -274,9 +279,11 @@ classdef TiePointTableWindow < handle
     methods (Access = private, Static)
         function data = emptyTiePointTable()
             data = table( ...
-                "Size", [0 7], ...
-                "VariableTypes", ["double", "double", "double", "double", "double", "logical", "string"], ...
-                "VariableNames", ["Id", "A_X", "A_Y", "B_X", "B_Y", "Enabled", "Notes"]);
+                "Size", [0 10], ...
+                "VariableTypes", ["double", "string", "string", "string", "string", ...
+                "string", "string", "string", "logical", "string"], ...
+                "VariableNames", ["Id", "A_X", "A_Y", "B_X", "B_Y", ...
+                "DX", "DY", "Residual", "Enabled", "Notes"]);
         end
 
         function data = formatTiePointTable(tiePoints)
@@ -285,6 +292,9 @@ classdef TiePointTableWindow < handle
             data.A_Y = anchor.TiePointTableWindow.formatCoordinateColumn(tiePoints.A_Y);
             data.B_X = anchor.TiePointTableWindow.formatCoordinateColumn(tiePoints.B_X);
             data.B_Y = anchor.TiePointTableWindow.formatCoordinateColumn(tiePoints.B_Y);
+            data.DX = anchor.TiePointTableWindow.formatCoordinateColumn(tiePoints.DX);
+            data.DY = anchor.TiePointTableWindow.formatCoordinateColumn(tiePoints.DY);
+            data.Residual = anchor.TiePointTableWindow.formatCoordinateColumn(tiePoints.Residual);
         end
 
         function values = formatCoordinateColumn(values)

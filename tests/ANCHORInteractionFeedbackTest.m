@@ -74,6 +74,27 @@ classdef ANCHORInteractionFeedbackTest < matlab.unittest.TestCase
             testCase.verifyEqual(app.getImageViewportState("A").getCenter(), [25.5 25.5], AbsTol=1e-12);
             testCase.verifyEqual(app.getImageViewportState("B").getCenter(), [35.5 35.5], AbsTol=1e-12);
         end
+
+        function displayTableIncludesDerivedDiagnostics(testCase)
+            app = anchor.ANCHOR(rand(120, 140), rand(120, 140));
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteHandle(app));
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteFile( ...
+                fullfile(pwd, "anchor_tiepoints.csv")));
+            id = app.createTiePointAtViewCenters();
+            tiePoints = app.getTiePointTable();
+            app.setImageViewportState("A", anchor.ViewportState([10.5 40.5], [10.5 40.5]));
+            app.setImageViewportState("B", anchor.ViewportState([20.5 50.5], [20.5 50.5]));
+            app.createTiePointAtViewCenters();
+            app.selectAndCenterTiePoint(id);
+
+            displayTable = app.getTiePointDisplayTable();
+
+            testCase.verifyTrue(all(ismember(["DX", "DY", "Residual"], ...
+                string(displayTable.Properties.VariableNames))));
+            testCase.verifyEqual(displayTable.DX, displayTable.A_X - displayTable.B_X, AbsTol=1e-12);
+            testCase.verifyEqual(displayTable.DY, displayTable.A_Y - displayTable.B_Y, AbsTol=1e-12);
+            testCase.verifyEqual(height(displayTable), height(tiePoints) + 1);
+        end
     end
 
     methods (Static, Access = private)
