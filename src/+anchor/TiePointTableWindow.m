@@ -19,6 +19,8 @@ classdef TiePointTableWindow < handle
         AddTiePointRequestedFcn = []
         DeleteTiePointRequestedFcn = []
         TiePointSelectedFcn = []
+        TiePointEditedFcn = []
+        CloseRequestedFcn = []
     end
 
     methods
@@ -57,7 +59,7 @@ classdef TiePointTableWindow < handle
             if height(tiePoints) == 0
                 window.Table.ColumnEditable = false(1, 7);
             else
-                window.Table.ColumnEditable = [false false false false false true true];
+                window.Table.ColumnEditable = [false true true true true true true];
             end
             window.DeleteButton.Enable = anchor.TiePointTableWindow.onOff(~isnan(activeId));
 
@@ -75,7 +77,7 @@ classdef TiePointTableWindow < handle
             window.UIFigure = uifigure( ...
                 "Name", window.WindowTitle, ...
                 "Position", window.InitialPosition, ...
-                "CloseRequestFcn", @(~, ~) delete(window), ...
+                "CloseRequestFcn", @(~, ~) window.handleCloseRequest(), ...
                 "WindowKeyPressFcn", @(~, event) window.handleKeyPress(event));
 
             window.GridLayout = uigridlayout(window.UIFigure, [2 1]);
@@ -124,6 +126,7 @@ classdef TiePointTableWindow < handle
             window.Table.ColumnEditable = false(1, 7);
             window.Table.ColumnWidth = {70, 90, 90, 90, 90, 80, "auto"};
             window.Table.CellSelectionCallback = @(~, event) window.handleCellSelection(event);
+            window.Table.CellEditCallback = @(~, event) window.handleCellEdit(event);
         end
 
         function handleCellSelection(window, event)
@@ -140,9 +143,38 @@ classdef TiePointTableWindow < handle
             window.invokeCallback(window.TiePointSelectedFcn, data.Id(rowIndex));
         end
 
+        function handleCellEdit(window, event)
+            if isempty(event.Indices)
+                return
+            end
+
+            rowIndex = event.Indices(1);
+            columnIndex = event.Indices(2);
+            data = window.Table.Data;
+            if rowIndex < 1 || rowIndex > height(data)
+                return
+            end
+
+            fieldNames = string(data.Properties.VariableNames);
+            if columnIndex < 1 || columnIndex > numel(fieldNames)
+                return
+            end
+
+            window.invokeCallback(window.TiePointEditedFcn, ...
+                data.Id(rowIndex), fieldNames(columnIndex), event.NewData);
+        end
+
         function handleKeyPress(window, event)
             if string(event.Key) == "backspace"
                 window.requestDeleteTiePoint();
+            end
+        end
+
+        function handleCloseRequest(window)
+            if isempty(window.CloseRequestedFcn)
+                delete(window);
+            else
+                window.invokeCallback(window.CloseRequestedFcn);
             end
         end
 

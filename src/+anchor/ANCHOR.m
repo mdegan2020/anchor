@@ -10,6 +10,7 @@ classdef ANCHOR < handle
         ImageWindowB
         TableWindow
         ActiveImageRole (1, 1) string = "A"
+        IsClosing (1, 1) logical = false
     end
 
     methods
@@ -42,6 +43,11 @@ classdef ANCHOR < handle
         end
 
         function delete(app)
+            if ~app.IsClosing
+                app.writeCsvIfReady();
+            end
+            app.IsClosing = true;
+
             anchor.ANCHOR.deleteIfValid(app.ImageWindowA);
             anchor.ANCHOR.deleteIfValid(app.ImageWindowB);
             anchor.ANCHOR.deleteIfValid(app.TableWindow);
@@ -103,6 +109,9 @@ classdef ANCHOR < handle
             app.TableWindow.AddTiePointRequestedFcn = @() app.createCenteredTiePoint();
             app.TableWindow.DeleteTiePointRequestedFcn = @() app.deleteActiveTiePointInternal();
             app.TableWindow.TiePointSelectedFcn = @(id) app.selectTiePoint(id);
+            app.TableWindow.TiePointEditedFcn = @(id, fieldName, value) ...
+                app.updateTiePointField(id, fieldName, value);
+            app.TableWindow.CloseRequestedFcn = @() app.closeApplication();
 
             app.ImageWindowA.CenteredTiePointRequestedFcn = @() app.createCenteredTiePoint();
             app.ImageWindowB.CenteredTiePointRequestedFcn = @() app.createCenteredTiePoint();
@@ -121,6 +130,9 @@ classdef ANCHOR < handle
 
             app.ImageWindowA.FocusGainedFcn = @() app.setActiveImageRole("A");
             app.ImageWindowB.FocusGainedFcn = @() app.setActiveImageRole("B");
+
+            app.ImageWindowA.CloseRequestedFcn = @() app.closeApplication();
+            app.ImageWindowB.CloseRequestedFcn = @() app.closeApplication();
         end
 
         function id = createCenteredTiePoint(app)
@@ -143,6 +155,11 @@ classdef ANCHOR < handle
         function updateTiePoint(app, imageRole, id, point)
             app.TiePointStore.updatePoint(id, imageRole, point);
             app.TiePointStore.selectTiePoint(id);
+            app.persistAndRefresh();
+        end
+
+        function updateTiePointField(app, id, fieldName, value)
+            app.TiePointStore.updateField(id, fieldName, value);
             app.persistAndRefresh();
         end
 
@@ -205,12 +222,27 @@ classdef ANCHOR < handle
         end
 
         function persistAndRefresh(app)
-            app.writeCsv();
+            app.writeCsvIfReady();
             app.refreshTiePointViews();
         end
 
-        function writeCsv(app)
+        function writeCsvIfReady(app)
+            if isempty(app.CsvWriter) || isempty(app.TiePointStore) || ...
+                    isempty(app.ImageSourceA) || isempty(app.ImageSourceB)
+                return
+            end
+
             app.CsvWriter.write(app.TiePointStore.toTable(), app.ImageSourceA, app.ImageSourceB);
+        end
+
+        function closeApplication(app)
+            if app.IsClosing
+                return
+            end
+
+            app.IsClosing = true;
+            app.writeCsvIfReady();
+            delete(app);
         end
 
         function refreshTiePointViews(app)

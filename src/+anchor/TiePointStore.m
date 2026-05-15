@@ -83,6 +83,33 @@ classdef TiePointStore < handle
                 error("anchor:TiePointStore:InvalidImageRole", ...
                     "Image role must be ""A"" or ""B"".");
             end
+
+            store.ActiveId = id;
+        end
+
+        function updateField(store, id, fieldName, value)
+            rowIndex = store.rowIndexForId(id);
+            if isempty(rowIndex)
+                return
+            end
+
+            fieldName = string(fieldName);
+
+            switch fieldName
+                case {"A_X", "A_Y", "B_X", "B_Y"}
+                    validateattributes(value, {'numeric'}, {'scalar', 'finite'}, ...
+                        'anchor.TiePointStore.updateField', char(fieldName));
+                    store.Points.(fieldName)(rowIndex) = double(value);
+                case "Enabled"
+                    store.Points.Enabled(rowIndex) = logical(value);
+                case "Notes"
+                    store.Points.Notes(rowIndex) = string(value);
+                otherwise
+                    error("anchor:TiePointStore:InvalidField", ...
+                        "Unsupported tiepoint field ""%s"".", fieldName);
+            end
+
+            store.ActiveId = id;
         end
 
         function nudgeActivePoint(store, imageRole, delta)

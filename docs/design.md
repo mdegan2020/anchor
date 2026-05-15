@@ -17,7 +17,7 @@ The two image display windows should be separate instances of the same class. Sh
 ## Current Assumptions
 
 - MATLAB is available locally at `/Applications/MATLAB_R2026a.app/bin/matlab`.
-- The first implementation will target single-channel images.
+- The first implementation will target single-channel 8-bit images that are already visually well adjusted.
 - Tiepoints are selected manually by the user.
 - Tiepoints are complete point pairs by invariant: each tiepoint has one coordinate in image A and one coordinate in image B.
 - The initial registration model assumes image A and image B are already aligned.
@@ -154,7 +154,6 @@ Likely stored fields per tiepoint:
 | `ImageAPoint` | `[x y]` full-resolution intrinsic pixel coordinate |
 | `ImageBPoint` | `[x y]` full-resolution intrinsic pixel coordinate |
 | `IsEnabled` | Whether the tiepoint participates in future fitting/export |
-| `Label` | Optional user label |
 | `Notes` | Optional free text |
 | `CreatedAt` | Timestamp |
 | `UpdatedAt` | Timestamp |
@@ -185,10 +184,10 @@ Initial table columns:
 | Column | Editable | Notes |
 | --- | --- | --- |
 | `Id` | No | Stable id |
-| `A_X` | Maybe | Full-resolution x coordinate in image A |
-| `A_Y` | Maybe | Full-resolution y coordinate in image A |
-| `B_X` | Maybe | Full-resolution x coordinate in image B |
-| `B_Y` | Maybe | Full-resolution y coordinate in image B |
+| `A_X` | Yes | Full-resolution x coordinate in image A |
+| `A_Y` | Yes | Full-resolution y coordinate in image A |
+| `B_X` | Yes | Full-resolution x coordinate in image B |
+| `B_Y` | Yes | Full-resolution y coordinate in image B |
 | `Enabled` | Yes | Include/exclude point |
 | `Notes` | Yes | Optional comments |
 
@@ -203,7 +202,7 @@ Responsibilities:
 - Expose query methods for current viewport, view center, scale, and focus state.
 - Accept commands to set viewport state, center on a point, or match another transformed view.
 - Convert between screen/display coordinates and full-resolution image coordinates.
-- Draw tiepoint markers for this image.
+- Draw tiepoint markers for this image. Markers should be an `X` with a small circle and no visible text label.
 - Highlight the active tiepoint.
 - Emit point-pick, marker-select, marker-move, and viewport-change events.
 - Emit keyboard command events for app-level shortcuts.
@@ -266,11 +265,18 @@ Responsibilities:
 
 - Store the current image A-to-image B and image B-to-image A transforms.
 - Initialize as identity because the first assumption is that the images are already registered.
-- Re-estimate the transform from enabled tiepoints after point creation, movement, deletion, or enable/disable changes.
+- Re-estimate the transform from all current tiepoints after point creation, movement, or deletion.
 - Provide view transfer helpers used by table-window buttons.
 - Provide region mapping helpers used by overlay and local correlation workflows.
 
-A full projective homography requires enough non-degenerate point pairs. Until that condition is met, ANCHOR should keep using the identity estimate or an explicitly documented lower-order fallback such as translation. The important behavior is that view matching remains predictable while the tiepoint set is still small.
+The transform fallback rules should be deterministic:
+
+- 0 tiepoints: identity transform.
+- 1 tiepoint: constant shift from the image A point to the image B point.
+- 2 tiepoints: average shift from the two point-pair deltas.
+- 3 or more tiepoints: attempt to compute the full homography.
+
+If full homography estimation fails because the points are degenerate, ANCHOR should retain the current valid estimate or fall back to average shift.
 
 ### `LocalRegistrationEstimator`
 
@@ -281,7 +287,7 @@ Responsibilities:
 - Take the focused image window's current `ViewportState`.
 - Use the current homography to estimate the corresponding non-focused image region.
 - Request comparable image patches from each `ImageSource`.
-- Estimate a local translation by correlation.
+- Estimate a local translation by phase correlation.
 - Return a proposed non-focused viewport with the same scale and a correlation-adjusted center.
 
 This helper must not update tiepoint coordinates. It is a navigation aid only; the user commits a new tiepoint afterward by pressing `Space` if the aligned view looks good.
@@ -294,12 +300,15 @@ Responsibilities:
 
 - Write the tiepoint table after point creation, point movement, deletion, enable/disable changes, and note edits.
 - Use an atomic write pattern: write a temporary file, then replace the target CSV.
+- Include all tiepoints, regardless of enabled state.
 - Include image source names or filenames.
 - Keep the initial schema simple:
 
 ```text
-fname1, ix1, iy1, fname2, ix2, iy2
+fname1, ix1, iy1, fname2, ix2, iy2, enabled
 ```
+
+where `enabled` is written as `1` for enabled tiepoints and `0` for disabled tiepoints.
 
 Future columns may include map coordinates if either image source exposes an image-to-map function handle.
 
@@ -337,14 +346,14 @@ Every normal tiepoint is a complete pair. A new tiepoint is created from the cur
 ANCHOR maintains a current transform estimate between image A and image B.
 
 - At startup, the transform is identity because the first working assumption is that the images are registered.
-- After tiepoint edits, the controller asks `HomographyModel` to update the estimate from enabled tiepoints.
+- After tiepoint edits, the controller asks `HomographyModel` to update the estimate from all current tiepoints.
 - Table-window buttons should transfer views in both directions:
   - Set image A view to match the current image B view.
   - Set image B view to match the current image A view.
 - View transfer should preserve the source window's approximate scale and map the visible center or extent through the current transform.
 - Each `ImageViewWindow` must expose its current `ViewportState` and current center point in full-resolution intrinsic coordinates.
 
-When there are too few tiepoints for a full homography, the app should continue using the current valid estimate. A later implementation can decide whether to support lower-order fallback transforms, but the UI should never leave the user without predictable view matching.
+When there are too few tiepoints for a full homography, the app should use the deterministic lower-order fallback rules described in `HomographyModel`.
 
 ## Expected User Workflow
 
@@ -380,7 +389,6 @@ The core workflow should make point creation deliberate: view-alignment aids hel
 - Zoom in/out.
 - Fit image to window.
 - 1:1 pixel view.
-- Contrast stretch controls.
 - Crosshair cursor/readout.
 
 These controls live in the image windows, while dataset-level actions live in the table/control window.
@@ -400,6 +408,8 @@ Keyboard shortcuts should work from either image window unless noted otherwise. 
 | `Space` | Create a new complete tiepoint at the current center of both image windows. |
 | `Shift` hold | Flicker the non-focused image as a translated overlay in the focused image window, aligned by the highlighted tiepoint. |
 | `Left Ctrl` hold | Show the non-focused image as a transparent translated overlay in the focused image window. |
+| `+` while holding `Left Ctrl` | Increase transparent overlay opacity. |
+| `-` while holding `Left Ctrl` | Decrease transparent overlay opacity. |
 | `Q` | Select the previous tiepoint and center both image windows on its coordinates. |
 | `E` | Select the next tiepoint and center both image windows on its coordinates. |
 | `Backspace` | Delete the currently highlighted tiepoint. |
@@ -440,6 +450,8 @@ Holding `Shift` in the focused image window should flicker the non-focused image
 Holding `Left Ctrl` in the focused image window should display the non-focused image transparently over the focused view.
 
 - Initial alignment is translation-only, derived from the highlighted tiepoint.
+- Default overlay opacity is 50%.
+- Pressing `+` or `-` while holding `Left Ctrl` increases or decreases opacity.
 - Right-click-drag translates the overlay interactively.
 - The translation is temporary until `Left Ctrl` is released.
 - On release, the focused image coordinate remains unchanged.
@@ -449,14 +461,14 @@ This mode needs a temporary overlay transform separate from the committed tiepoi
 
 ## Local Correlation Alignment
 
-Pressing `G` should estimate a local translation between the focused image and the non-focused image.
+Pressing `G` should estimate a local translation between the focused image and the non-focused image using phase correlation.
 
 Process:
 
 1. Query the focused image window's current view extent and scale.
 2. Use the current homography to estimate the corresponding region in the non-focused image.
 3. Render comparable patches from both image sources in memory.
-4. Correlate the patches to estimate a local translation.
+4. Use phase correlation on the patches to estimate a local translation.
 5. Update the non-focused image window to the same scale and a correlation-adjusted center.
 
 This action must not update the highlighted tiepoint or create a new point. If the user likes the aligned views, pressing `Space` creates a new complete tiepoint at the two current view centers.
@@ -489,7 +501,8 @@ Important user actions should flow through the controller:
 | Move marker | Image window | Update one coordinate in store; update homography and CSV |
 | Nudge marker | Image window shortcut | Move active coordinate in focused window; update homography and CSV |
 | Delete tiepoint | Table or shortcut | Remove whole tiepoint pair; choose next selection; update homography and CSV |
-| Change contrast | Image window | Update only that image window's view state |
+| Edit table coordinate | Table window | Update one coordinate in store; update marker, homography, and CSV |
+| Edit enabled/notes field | Table window | Update store and CSV; enabled state is written but homography still uses all points |
 | Match A view from B | Table window | Query B viewport; transform through homography; set A viewport |
 | Match B view from A | Table window | Query A viewport; transform through homography; set B viewport |
 | Toggle focus | Image window shortcut | Bring the other image window forward |
@@ -506,9 +519,9 @@ Implementation can start with callback properties on each window class, for exam
 
 The application should handle window closure explicitly:
 
-- Closing the table window should prompt for unsaved changes once saving exists, then close the image windows.
-- Closing one image window should either hide that image window or ask whether to close the session.
-- Closing the controller should delete all owned `uifigure` objects.
+- Closing the table window should close the full app after writing the current CSV.
+- Closing either image window should close the full app after writing the current CSV.
+- Closing the controller should write the current CSV and delete all owned `uifigure` objects.
 - Each window class should implement `delete` defensively so repeated cleanup is harmless.
 
 ## UI Technology Notes
@@ -531,12 +544,13 @@ Early tests should focus on non-UI behavior:
 
 - Creating tiepoints.
 - Updating image A and image B coordinates.
+- Editing coordinates directly in the table.
 - Deleting and selecting tiepoints.
 - Enforcing complete-pair tiepoint creation.
 - Converting model data to a table.
 - Updating homography state after tiepoint edits.
 - Mapping viewport centers/extents through the homography.
-- Writing CSV output with the expected schema.
+- Writing CSV output with the expected schema, including `enabled` as `1` or `0`.
 - Computing local correlation shifts from synthetic translated patches.
 - Saving and loading session structs.
 
@@ -556,7 +570,7 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 - Add `TiePointStore`.
 - Add centered, select, delete, and enable/disable complete tiepoints from the table window.
 - Keep table state synchronized with the model.
-- Add continuous CSV writing with the initial `fname1, ix1, iy1, fname2, ix2, iy2` schema.
+- Add continuous CSV writing with the initial `fname1, ix1, iy1, fname2, ix2, iy2, enabled` schema.
 
 ### Milestone 3: Manual Picking
 
@@ -573,9 +587,9 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 - Add table-window buttons for image A from image B and image B from image A view matching.
 - Make each image window's `ViewportState` queryable and settable.
 
-### Milestone 5: Navigation, Focus, and Contrast
+### Milestone 5: Navigation and Focus
 
-- Add pan, zoom, fit-to-window, and contrast controls.
+- Add pan, zoom, and fit-to-window controls.
 - Preserve full-resolution coordinates while viewing decimated imagery.
 - Add image A/image B focus toggling with `F`.
 - Add crosshair toggling with `C`.
@@ -606,26 +620,10 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 
 ## Open Questions
 
-- Should image A/image B be called fixed/moving, reference/secondary, left/right, or something else?
-- Should point coordinates be editable directly in the table?
-- What contrast controls are required: min/max fields, sliders, histogram stretch, presets, or per-image auto contrast?
-- Should points have labels visible in the image windows?
-- Do we need georeferenced coordinates in addition to pixel coordinates?
-- Should the homography estimator use only enabled tiepoints, all tiepoints, or a separate inlier/outlier state?
-- What fallback transform should be used before there are enough points for a full homography?
-- What correlation metric and search window should the `G` key use first?
-- What transparency level should the `Left Ctrl` overlay use?
-- Should the CSV writer include disabled tiepoints or only enabled tiepoints?
-- Should closing an image window hide it, reopen it on demand, or close the full session?
+- What patch size, search window, and preprocessing should phase correlation use first?
+- How should future georeferenced/map coordinates be represented in the CSV export?
+- Should closing the table window require confirmation, or is the continuous CSV enough protection?
 
 ## Proposed Next Step
 
-After manual control requirements are clearer, create a minimal class skeleton with:
-
-- `anchor.ANCHOR`
-- `anchor.TiePointStore`
-- `anchor.ImageViewWindow`
-- `anchor.TiePointTableWindow`
-- `anchor.MatrixImageSource`
-
-The first runnable milestone should open three floating windows using synthetic images and allow creation, selection, and display of a small set of tiepoints.
+Proceed to Milestone 4: implement `HomographyModel`, make `ViewportState` explicit enough for view transfer, and add the table-window buttons that set image A from image B and image B from image A.
