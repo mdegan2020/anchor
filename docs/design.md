@@ -130,9 +130,10 @@ Possible construction API:
 
 ```matlab
 app = anchor.ANCHOR(imageA, imageB);
+app = anchor.ANCHOR(imageA, imageB, csvOutputPath);
 ```
 
-where `imageA` and `imageB` can initially be numeric matrices, then later file paths or richer image source objects.
+where `imageA` and `imageB` can initially be numeric matrices, then later file paths or richer image source objects. `csvOutputPath` is optional and configures the continuous tiepoint CSV writer.
 
 ### `TiePointStore`
 
@@ -424,7 +425,7 @@ The `W/A/S/D` nudge size should start as one image pixel at full resolution. Lat
 | --- | --- |
 | Left-click-drag image background | Pan/translate the focused image view. |
 | Mouse wheel over image | Zoom in/out around the cursor location. |
-| Double left-click image background | Center or zoom the focused image view using normal image-viewer behavior, to be refined during implementation. |
+| Double left-click image background | Center the clicked image coordinate in the focused image view. |
 | Left-click marker | Select the marker's tiepoint and highlight its row in the table. |
 | Double left-click marker | Select the tiepoint and center the other image window on the corresponding point. |
 | Left-click-drag marker | Move the marker in the focused image window and update only that image coordinate. |

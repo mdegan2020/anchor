@@ -22,12 +22,15 @@ classdef ANCHOR < handle
     end
 
     methods
-        function app = ANCHOR(imageA, imageB)
+        function app = ANCHOR(imageA, imageB, csvOutputPath)
             if nargin == 0
                 [imageA, imageB] = anchor.ANCHOR.createDemoImages();
-            elseif nargin ~= 2
+                csvOutputPath = "";
+            elseif nargin == 2
+                csvOutputPath = "";
+            elseif nargin ~= 3
                 error("anchor:ANCHOR:InvalidInput", ...
-                    "ANCHOR expects either zero inputs or two image inputs.");
+                    "ANCHOR expects zero inputs, two image inputs, or two image inputs and a CSV output path.");
             end
 
             app.ImageSourceA = anchor.ANCHOR.asImageSource(imageA, "Image A");
@@ -35,7 +38,7 @@ classdef ANCHOR < handle
             app.TiePointStore = anchor.TiePointStore();
             app.HomographyModel = anchor.HomographyModel();
             app.LocalRegistrationEstimator = anchor.LocalRegistrationEstimator();
-            app.CsvWriter = anchor.CsvTiePointWriter();
+            app.CsvWriter = anchor.ANCHOR.createCsvWriter(csvOutputPath);
 
             positions = anchor.ANCHOR.defaultWindowPositions();
 
@@ -630,6 +633,15 @@ classdef ANCHOR < handle
 
             error("anchor:ANCHOR:UnsupportedImageInput", ...
                 "Image inputs must be numeric matrices or anchor.MatrixImageSource instances.");
+        end
+
+        function writer = createCsvWriter(csvOutputPath)
+            csvOutputPath = string(csvOutputPath);
+            if strlength(csvOutputPath) == 0
+                writer = anchor.CsvTiePointWriter();
+            else
+                writer = anchor.CsvTiePointWriter(csvOutputPath);
+            end
         end
 
         function state = viewportToStruct(viewport)

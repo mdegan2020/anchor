@@ -17,10 +17,9 @@ classdef ImageViewWindow < handle
         ImageHandle
         MarkerHandles = gobjects(0)
         DragTiePointId double = NaN
+        LastMarkerDoubleClickTime (1, 1) datetime = NaT
         IsPanning (1, 1) logical = false
         PanStartPoint (1, 2) double = [NaN NaN]
-        PanStartXLim (1, 2) double = [NaN NaN]
-        PanStartYLim (1, 2) double = [NaN NaN]
         CrosshairVisible (1, 1) logical = false
         CrosshairHandles = gobjects(0)
         OverlayHandle = gobjects(0)
@@ -111,6 +110,30 @@ classdef ImageViewWindow < handle
             xWidth = diff(window.Axes.XLim);
             yHeight = diff(window.Axes.YLim);
             window.setCenteredLimits(point, xWidth, yHeight);
+        end
+
+        function zoomAtPoint(window, anchorPoint, zoomFactor)
+            oldXLim = window.Axes.XLim;
+            oldYLim = window.Axes.YLim;
+            oldWidth = diff(oldXLim);
+            oldHeight = diff(oldYLim);
+
+            anchorPoint = window.clampPoint(anchorPoint);
+            xFraction = (anchorPoint(1) - oldXLim(1)) / oldWidth;
+            yFraction = (anchorPoint(2) - oldYLim(1)) / oldHeight;
+            xFraction = min(max(xFraction, 0), 1);
+            yFraction = min(max(yFraction, 0), 1);
+
+            newWidth = oldWidth * zoomFactor;
+            newHeight = oldHeight * zoomFactor;
+            xLimits = [ ...
+                anchorPoint(1) - xFraction * newWidth, ...
+                anchorPoint(1) + (1 - xFraction) * newWidth];
+            yLimits = [ ...
+                anchorPoint(2) - yFraction * newHeight, ...
+                anchorPoint(2) + (1 - yFraction) * newHeight];
+
+            window.setLimits(xLimits, yLimits);
         end
 
         function fitToImage(window)
@@ -319,6 +342,7 @@ classdef ImageViewWindow < handle
             window.invokeCallback(window.TiePointSelectedFcn, id);
 
             if selectionType == "open"
+                window.LastMarkerDoubleClickTime = datetime("now");
                 window.invokeCallback(window.MarkerDoubleClickedFcn, id);
                 return
             end
@@ -328,23 +352,36 @@ classdef ImageViewWindow < handle
 
         function handleWindowButtonDown(window)
             window.invokeCallback(window.FocusGainedFcn);
+            selectionType = string(window.UIFigure.SelectionType);
 
-            if ~isnan(window.DragTiePointId) || string(window.UIFigure.SelectionType) ~= "normal"
-                if window.hasOverlay() && string(window.UIFigure.SelectionType) == "alt"
+            if selectionType == "open"
+                if ~isnat(window.LastMarkerDoubleClickTime) && ...
+                        seconds(datetime("now") - window.LastMarkerDoubleClickTime) < 0.25
+                    window.LastMarkerDoubleClickTime = NaT;
+                    return
+                end
+
+                point = window.getCurrentAxesPoint();
+                if window.isPointInsideView(point)
+                    window.centerOnPoint(point);
+                end
+                return
+            end
+
+            if ~isnan(window.DragTiePointId) || selectionType ~= "normal"
+                if window.hasOverlay() && selectionType == "alt"
                     window.startOverlayDrag();
                 end
                 return
             end
 
-            point = window.getCurrentImagePoint();
+            point = window.getCurrentAxesPoint();
             if ~window.isPointInsideView(point)
                 return
             end
 
             window.IsPanning = true;
             window.PanStartPoint = point;
-            window.PanStartXLim = window.Axes.XLim;
-            window.PanStartYLim = window.Axes.YLim;
         end
 
         function handleWindowButtonMotion(window)
@@ -357,10 +394,11 @@ classdef ImageViewWindow < handle
                 end
 
                 if window.IsPanning
-                    currentPoint = window.getCurrentImagePoint();
+                    currentPoint = window.getCurrentAxesPoint();
                     delta = currentPoint - window.PanStartPoint;
-                    window.setLimits(window.PanStartXLim - delta(1), ...
-                        window.PanStartYLim - delta(2));
+                    window.setLimits(window.Axes.XLim - delta(1), ...
+                        window.Axes.YLim - delta(2));
+                    drawnow limitrate
                 end
                 return
             end
@@ -393,18 +431,22 @@ classdef ImageViewWindow < handle
         end
 
         function handleMouseWheel(window, event)
-            anchorPoint = window.getCurrentImagePoint();
-            zoomFactor = 1.2 ^ event.VerticalScrollCount;
-            newWidth = diff(window.Axes.XLim) * zoomFactor;
-            newHeight = diff(window.Axes.YLim) * zoomFactor;
+            anchorPoint = window.getCurrentAxesPoint();
+            if ~window.isPointInsideView(anchorPoint)
+                return
+            end
 
-            window.setCenteredLimits(anchorPoint, newWidth, newHeight);
+            zoomFactor = 1.2 ^ event.VerticalScrollCount;
+            window.zoomAtPoint(anchorPoint, zoomFactor);
         end
 
         function point = getCurrentImagePoint(window)
+            point = window.clampPoint(window.getCurrentAxesPoint());
+        end
+
+        function point = getCurrentAxesPoint(window)
             currentPoint = window.Axes.CurrentPoint;
             point = currentPoint(1, 1:2);
-            point = window.clampPoint(point);
         end
 
         function point = clampPoint(window, point)

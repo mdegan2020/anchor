@@ -1,0 +1,65 @@
+classdef ANCHORInteractionFeedbackTest < matlab.unittest.TestCase
+    %ANCHORInteractionFeedbackTest Tests recent interaction feedback fixes.
+
+    methods (TestClassSetup)
+        function addSourceToPath(testCase)
+            srcFolder = fullfile(fileparts(fileparts(mfilename("fullpath"))), "src");
+            testCase.applyFixture(matlab.unittest.fixtures.PathFixture(srcFolder));
+        end
+    end
+
+    methods (Test)
+        function constructorAcceptsOptionalCsvOutputPath(testCase)
+            csvPath = string(tempname) + ".csv";
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteFile(csvPath));
+            app = anchor.ANCHOR(rand(16, 16), rand(16, 16), csvPath);
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteHandle(app));
+
+            app.createTiePointAtViewCenters();
+
+            testCase.verifyEqual(app.getCsvOutputPath(), csvPath);
+            testCase.verifyTrue(isfile(csvPath));
+        end
+
+        function zoomAtPointKeepsAnchorAtSameViewFraction(testCase)
+            source = anchor.MatrixImageSource(rand(100, 120), "Zoom test");
+            window = anchor.ImageViewWindow(source, "A", ...
+                "ANCHOR Zoom Test", [100 100 360 300]);
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteHandle(window));
+            window.setViewportState(anchor.ViewportState([10.5 50.5], [20.5 60.5]));
+            anchorPoint = [20.5 30.5];
+            beforeState = window.getViewportState();
+            beforeFraction = ANCHORInteractionFeedbackTest.viewFraction( ...
+                beforeState, anchorPoint);
+
+            window.zoomAtPoint(anchorPoint, 0.5);
+            afterState = window.getViewportState();
+            afterFraction = ANCHORInteractionFeedbackTest.viewFraction( ...
+                afterState, anchorPoint);
+
+            testCase.verifyEqual(afterState.getWidth(), 20, AbsTol=1e-12);
+            testCase.verifyEqual(afterState.getHeight(), 20, AbsTol=1e-12);
+            testCase.verifyEqual(afterFraction, beforeFraction, AbsTol=1e-12);
+        end
+    end
+
+    methods (Static, Access = private)
+        function fraction = viewFraction(viewportState, point)
+            fraction = [ ...
+                (point(1) - viewportState.XLim(1)) / viewportState.getWidth(), ...
+                (point(2) - viewportState.YLim(1)) / viewportState.getHeight()];
+        end
+
+        function deleteFile(filePath)
+            if isfile(filePath)
+                delete(filePath);
+            end
+        end
+
+        function deleteHandle(handleObject)
+            if isvalid(handleObject)
+                delete(handleObject);
+            end
+        end
+    end
+end
