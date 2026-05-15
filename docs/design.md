@@ -614,6 +614,8 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 - Implement `G` key view alignment using homography initialization plus local correlation.
 - Update only the non-focused viewport; do not update tiepoints.
 
+Status: implemented for in-memory matrix image sources using focused-view viewport rendering and FFT phase correlation.
+
 ### Milestone 8: Session Persistence
 
 - Save and load sessions.
@@ -635,4 +637,4 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 
 ## Proposed Next Step
 
-Proceed to Milestone 7: implement `LocalRegistrationEstimator` and the `G` key view-alignment workflow using homography initialization plus phase correlation.
+Proceed to Milestone 8: add session persistence for image references, tiepoints, homography state, CSV target, and useful view state.

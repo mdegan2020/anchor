@@ -27,6 +27,30 @@ classdef MatrixImageSource < handle
             displayData = source.Data;
         end
 
+        function outputSize = getViewportOutputSize(~, viewportState)
+            outputSize = [ ...
+                max(1, round(viewportState.getHeight())), ...
+                max(1, round(viewportState.getWidth()))];
+        end
+
+        function patch = renderViewport(source, viewportState, outputSize)
+            arguments
+                source
+                viewportState anchor.ViewportState
+                outputSize (1, 2) double {mustBeInteger, mustBePositive}
+            end
+
+            nRows = outputSize(1);
+            nCols = outputSize(2);
+            xSamples = anchor.MatrixImageSource.sampleCenters( ...
+                viewportState.XLim, nCols);
+            ySamples = anchor.MatrixImageSource.sampleCenters( ...
+                viewportState.YLim, nRows);
+            [xGrid, yGrid] = meshgrid(xSamples, ySamples);
+
+            patch = interp2(double(source.Data), xGrid, yGrid, "linear", NaN);
+        end
+
         function limits = getDisplayLimits(source)
             finiteData = double(source.Data(isfinite(source.Data)));
 
@@ -44,6 +68,22 @@ classdef MatrixImageSource < handle
             end
 
             limits = [low high];
+        end
+    end
+
+    methods (Access = private, Static)
+        function samples = sampleCenters(limits, count)
+            width = diff(limits);
+            sampleSpacing = width / count;
+            if count == 1
+                samples = mean(limits);
+                return
+            end
+
+            samples = linspace( ...
+                limits(1) + sampleSpacing / 2, ...
+                limits(2) - sampleSpacing / 2, ...
+                count);
         end
     end
 end

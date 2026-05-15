@@ -36,5 +36,15 @@ classdef ViewportState
                 state.XLim(2), state.YLim(2); ...
                 state.XLim(1), state.YLim(2)];
         end
+
+        function shiftedState = translate(state, shift)
+            arguments
+                state
+                shift (1, 2) double
+            end
+
+            shiftedState = anchor.ViewportState( ...
+                state.XLim + shift(1), state.YLim + shift(2));
+        end
     end
 end

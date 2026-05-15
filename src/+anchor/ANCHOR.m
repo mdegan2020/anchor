@@ -6,6 +6,7 @@ classdef ANCHOR < handle
         ImageSourceB
         TiePointStore
         HomographyModel
+        LocalRegistrationEstimator
         CsvWriter
         ImageWindowA
         ImageWindowB
@@ -32,6 +33,7 @@ classdef ANCHOR < handle
             app.ImageSourceB = anchor.ANCHOR.asImageSource(imageB, "Image B");
             app.TiePointStore = anchor.TiePointStore();
             app.HomographyModel = anchor.HomographyModel();
+            app.LocalRegistrationEstimator = anchor.LocalRegistrationEstimator();
             app.CsvWriter = anchor.CsvTiePointWriter();
 
             positions = anchor.ANCHOR.defaultWindowPositions();
@@ -120,6 +122,14 @@ classdef ANCHOR < handle
 
         function matchImageBViewFromA(app)
             app.matchView("A", "B");
+        end
+
+        function result = alignOtherViewByLocalCorrelation(app, focusedRole)
+            if nargin < 2
+                focusedRole = app.ActiveImageRole;
+            end
+
+            result = app.alignOtherViewByLocalCorrelationInternal(string(focusedRole));
         end
 
         function imageRole = getActiveImageRole(app)
@@ -216,6 +226,8 @@ classdef ANCHOR < handle
                     app.toggleImageFocus(imageRole);
                 case "c"
                     app.getImageWindow(imageRole).toggleCrosshair();
+                case "g"
+                    app.alignOtherViewByLocalCorrelationInternal(imageRole);
                 case {"add", "equal", "plus"}
                     if any(modifiers == "control") || app.OverlayMode == "transparent"
                         app.adjustOverlayAlpha(0.05);
@@ -365,6 +377,23 @@ classdef ANCHOR < handle
             targetState = app.HomographyModel.mapViewport( ...
                 sourceWindow.getViewportState(), sourceRole, targetRole);
             targetWindow.setViewportState(targetState);
+        end
+
+        function result = alignOtherViewByLocalCorrelationInternal(app, focusedRole)
+            otherRole = app.otherImageRole(focusedRole);
+            focusedWindow = app.getImageWindow(focusedRole);
+            otherWindow = app.getImageWindow(otherRole);
+            focusedState = focusedWindow.getViewportState();
+            initialOtherState = app.HomographyModel.mapViewport( ...
+                focusedState, focusedRole, otherRole);
+
+            result = app.LocalRegistrationEstimator.estimate( ...
+                app.getImageSource(focusedRole), ...
+                app.getImageSource(otherRole), ...
+                focusedState, ...
+                initialOtherState);
+
+            otherWindow.setViewportState(result.TargetViewportState);
         end
 
         function toggleImageFocus(app, sourceRole)
