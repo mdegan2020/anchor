@@ -15,6 +15,12 @@ classdef TiePointTableWindow < handle
         Table
     end
 
+    properties
+        AddTiePointRequestedFcn = []
+        DeleteTiePointRequestedFcn = []
+        TiePointSelectedFcn = []
+    end
+
     methods
         function window = TiePointTableWindow(windowTitle, initialPosition)
             arguments
@@ -45,6 +51,23 @@ classdef TiePointTableWindow < handle
                 name = window.WindowTitle;
             end
         end
+
+        function setTiePoints(window, tiePoints, activeId)
+            window.Table.Data = tiePoints;
+            if height(tiePoints) == 0
+                window.Table.ColumnEditable = false(1, 7);
+            else
+                window.Table.ColumnEditable = [false false false false false true true];
+            end
+            window.DeleteButton.Enable = anchor.TiePointTableWindow.onOff(~isnan(activeId));
+
+            if ~isnan(activeId)
+                rowIndex = find(tiePoints.Id == activeId, 1);
+                if ~isempty(rowIndex) && isprop(window.Table, "Selection")
+                    window.Table.Selection = [rowIndex 1];
+                end
+            end
+        end
     end
 
     methods (Access = private)
@@ -52,7 +75,8 @@ classdef TiePointTableWindow < handle
             window.UIFigure = uifigure( ...
                 "Name", window.WindowTitle, ...
                 "Position", window.InitialPosition, ...
-                "CloseRequestFcn", @(~, ~) delete(window));
+                "CloseRequestFcn", @(~, ~) delete(window), ...
+                "WindowKeyPressFcn", @(~, event) window.handleKeyPress(event));
 
             window.GridLayout = uigridlayout(window.UIFigure, [2 1]);
             window.GridLayout.RowHeight = {"fit", "1x"};
@@ -70,13 +94,14 @@ classdef TiePointTableWindow < handle
 
             window.AddButton = uibutton(window.ToolbarGrid, ...
                 "Text", "Add Centered Point", ...
-                "Enable", "off");
+                "ButtonPushedFcn", @(~, ~) window.requestAddTiePoint());
             window.AddButton.Layout.Row = 1;
             window.AddButton.Layout.Column = 1;
 
             window.DeleteButton = uibutton(window.ToolbarGrid, ...
                 "Text", "Delete", ...
-                "Enable", "off");
+                "Enable", "off", ...
+                "ButtonPushedFcn", @(~, ~) window.requestDeleteTiePoint());
             window.DeleteButton.Layout.Row = 1;
             window.DeleteButton.Layout.Column = 2;
 
@@ -98,6 +123,35 @@ classdef TiePointTableWindow < handle
             window.Table.Data = anchor.TiePointTableWindow.emptyTiePointTable();
             window.Table.ColumnEditable = false(1, 7);
             window.Table.ColumnWidth = {70, 90, 90, 90, 90, 80, "auto"};
+            window.Table.CellSelectionCallback = @(~, event) window.handleCellSelection(event);
+        end
+
+        function handleCellSelection(window, event)
+            if isempty(event.Indices)
+                return
+            end
+
+            rowIndex = event.Indices(1);
+            data = window.Table.Data;
+            if rowIndex < 1 || rowIndex > height(data)
+                return
+            end
+
+            window.invokeCallback(window.TiePointSelectedFcn, data.Id(rowIndex));
+        end
+
+        function handleKeyPress(window, event)
+            if string(event.Key) == "backspace"
+                window.requestDeleteTiePoint();
+            end
+        end
+
+        function requestAddTiePoint(window)
+            window.invokeCallback(window.AddTiePointRequestedFcn);
+        end
+
+        function requestDeleteTiePoint(window)
+            window.invokeCallback(window.DeleteTiePointRequestedFcn);
         end
     end
 
@@ -107,6 +161,20 @@ classdef TiePointTableWindow < handle
                 "Size", [0 7], ...
                 "VariableTypes", ["double", "double", "double", "double", "double", "logical", "string"], ...
                 "VariableNames", ["Id", "A_X", "A_Y", "B_X", "B_Y", "Enabled", "Notes"]);
+        end
+
+        function invokeCallback(callback, varargin)
+            if ~isempty(callback)
+                callback(varargin{:});
+            end
+        end
+
+        function value = onOff(tf)
+            if tf
+                value = "on";
+            else
+                value = "off";
+            end
         end
     end
 end

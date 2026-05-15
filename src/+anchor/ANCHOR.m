@@ -4,9 +4,12 @@ classdef ANCHOR < handle
     properties (Access = private)
         ImageSourceA
         ImageSourceB
+        TiePointStore
+        CsvWriter
         ImageWindowA
         ImageWindowB
         TableWindow
+        ActiveImageRole (1, 1) string = "A"
     end
 
     methods
@@ -20,6 +23,8 @@ classdef ANCHOR < handle
 
             app.ImageSourceA = anchor.ANCHOR.asImageSource(imageA, "Image A");
             app.ImageSourceB = anchor.ANCHOR.asImageSource(imageB, "Image B");
+            app.TiePointStore = anchor.TiePointStore();
+            app.CsvWriter = anchor.CsvTiePointWriter();
 
             positions = anchor.ANCHOR.defaultWindowPositions();
 
@@ -31,6 +36,9 @@ classdef ANCHOR < handle
 
             app.ImageWindowB = anchor.ImageViewWindow( ...
                 app.ImageSourceB, "B", "ANCHOR Image B", positions.ImageB);
+
+            app.wireCallbacks();
+            app.refreshTiePointViews();
         end
 
         function delete(app)
@@ -63,6 +71,155 @@ classdef ANCHOR < handle
             if anchor.ANCHOR.isOpen(app.ImageWindowB)
                 names(end + 1) = app.ImageWindowB.getWindowName();
             end
+        end
+
+        function count = getTiePointCount(app)
+            count = app.TiePointStore.getCount();
+        end
+
+        function id = getActiveTiePointId(app)
+            id = app.TiePointStore.getActiveId();
+        end
+
+        function outputPath = getCsvOutputPath(app)
+            outputPath = app.CsvWriter.OutputPath;
+        end
+
+        function id = createTiePointAtViewCenters(app)
+            id = app.createCenteredTiePoint();
+        end
+
+        function deleteActiveTiePoint(app)
+            app.deleteActiveTiePointInternal();
+        end
+
+        function data = getTiePointTable(app)
+            data = app.TiePointStore.toTable();
+        end
+    end
+
+    methods (Access = private)
+        function wireCallbacks(app)
+            app.TableWindow.AddTiePointRequestedFcn = @() app.createCenteredTiePoint();
+            app.TableWindow.DeleteTiePointRequestedFcn = @() app.deleteActiveTiePointInternal();
+            app.TableWindow.TiePointSelectedFcn = @(id) app.selectTiePoint(id);
+
+            app.ImageWindowA.CenteredTiePointRequestedFcn = @() app.createCenteredTiePoint();
+            app.ImageWindowB.CenteredTiePointRequestedFcn = @() app.createCenteredTiePoint();
+
+            app.ImageWindowA.TiePointSelectedFcn = @(id) app.selectTiePoint(id);
+            app.ImageWindowB.TiePointSelectedFcn = @(id) app.selectTiePoint(id);
+
+            app.ImageWindowA.MarkerMovedFcn = @(id, point) app.updateTiePoint("A", id, point);
+            app.ImageWindowB.MarkerMovedFcn = @(id, point) app.updateTiePoint("B", id, point);
+
+            app.ImageWindowA.MarkerDoubleClickedFcn = @(id) app.centerOtherWindowOnTiePoint("A", id);
+            app.ImageWindowB.MarkerDoubleClickedFcn = @(id) app.centerOtherWindowOnTiePoint("B", id);
+
+            app.ImageWindowA.KeyPressedFcn = @(key) app.handleImageKey("A", key);
+            app.ImageWindowB.KeyPressedFcn = @(key) app.handleImageKey("B", key);
+
+            app.ImageWindowA.FocusGainedFcn = @() app.setActiveImageRole("A");
+            app.ImageWindowB.FocusGainedFcn = @() app.setActiveImageRole("B");
+        end
+
+        function id = createCenteredTiePoint(app)
+            pointA = app.ImageWindowA.getViewCenter();
+            pointB = app.ImageWindowB.getViewCenter();
+            id = app.TiePointStore.createTiePoint(pointA, pointB);
+            app.persistAndRefresh();
+        end
+
+        function deleteActiveTiePointInternal(app)
+            app.TiePointStore.deleteActive();
+            app.persistAndRefresh();
+        end
+
+        function selectTiePoint(app, id)
+            app.TiePointStore.selectTiePoint(id);
+            app.refreshTiePointViews();
+        end
+
+        function updateTiePoint(app, imageRole, id, point)
+            app.TiePointStore.updatePoint(id, imageRole, point);
+            app.TiePointStore.selectTiePoint(id);
+            app.persistAndRefresh();
+        end
+
+        function handleImageKey(app, imageRole, key)
+            app.setActiveImageRole(imageRole);
+
+            switch key
+                case "space"
+                    app.createCenteredTiePoint();
+                case "backspace"
+                    app.deleteActiveTiePointInternal();
+                case "w"
+                    app.nudgeActivePoint(imageRole, [0 -1]);
+                case "a"
+                    app.nudgeActivePoint(imageRole, [-1 0]);
+                case "s"
+                    app.nudgeActivePoint(imageRole, [0 1]);
+                case "d"
+                    app.nudgeActivePoint(imageRole, [1 0]);
+                case "q"
+                    app.TiePointStore.selectPrevious();
+                    app.centerWindowsOnActiveTiePoint();
+                    app.refreshTiePointViews();
+                case "e"
+                    app.TiePointStore.selectNext();
+                    app.centerWindowsOnActiveTiePoint();
+                    app.refreshTiePointViews();
+            end
+        end
+
+        function nudgeActivePoint(app, imageRole, delta)
+            app.TiePointStore.nudgeActivePoint(imageRole, delta);
+            app.persistAndRefresh();
+        end
+
+        function centerWindowsOnActiveTiePoint(app)
+            id = app.TiePointStore.getActiveId();
+            if isnan(id)
+                return
+            end
+
+            app.ImageWindowA.centerOnPoint(app.TiePointStore.getPoint(id, "A"));
+            app.ImageWindowB.centerOnPoint(app.TiePointStore.getPoint(id, "B"));
+        end
+
+        function centerOtherWindowOnTiePoint(app, sourceRole, id)
+            app.TiePointStore.selectTiePoint(id);
+
+            if sourceRole == "A"
+                app.ImageWindowB.centerOnPoint(app.TiePointStore.getPoint(id, "B"));
+            else
+                app.ImageWindowA.centerOnPoint(app.TiePointStore.getPoint(id, "A"));
+            end
+
+            app.refreshTiePointViews();
+        end
+
+        function setActiveImageRole(app, imageRole)
+            app.ActiveImageRole = imageRole;
+        end
+
+        function persistAndRefresh(app)
+            app.writeCsv();
+            app.refreshTiePointViews();
+        end
+
+        function writeCsv(app)
+            app.CsvWriter.write(app.TiePointStore.toTable(), app.ImageSourceA, app.ImageSourceB);
+        end
+
+        function refreshTiePointViews(app)
+            tiePoints = app.TiePointStore.toTable();
+            activeId = app.TiePointStore.getActiveId();
+
+            app.TableWindow.setTiePoints(tiePoints, activeId);
+            app.ImageWindowA.setTiePoints(tiePoints, activeId);
+            app.ImageWindowB.setTiePoints(tiePoints, activeId);
         end
     end
 
