@@ -41,6 +41,22 @@ classdef ANCHORInteractionFeedbackTest < matlab.unittest.TestCase
             testCase.verifyEqual(afterState.getHeight(), 20, AbsTol=1e-12);
             testCase.verifyEqual(afterFraction, beforeFraction, AbsTol=1e-12);
         end
+
+        function matchOtherViewFromFocusedTransfersViewport(testCase)
+            app = anchor.ANCHOR(rand(120, 140), rand(120, 140));
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteHandle(app));
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteFile( ...
+                fullfile(pwd, "anchor_tiepoints.csv")));
+            sourceState = anchor.ViewportState([20.5 70.5], [30.5 80.5]);
+            app.setImageViewportState("A", sourceState);
+            app.setImageViewportState("B", anchor.ViewportState([1.5 40.5], [1.5 40.5]));
+
+            app.matchOtherViewFromFocused("A");
+            targetState = app.getImageViewportState("B");
+
+            testCase.verifyEqual(targetState.XLim, sourceState.XLim, AbsTol=1e-12);
+            testCase.verifyEqual(targetState.YLim, sourceState.YLim, AbsTol=1e-12);
+        end
     end
 
     methods (Static, Access = private)

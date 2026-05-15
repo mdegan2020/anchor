@@ -40,6 +40,7 @@ classdef ImageViewWindow < handle
         MarkerDoubleClickedFcn = []
         KeyPressedFcn = []
         KeyReleasedFcn = []
+        MouseWheelFcn = []
         FocusGainedFcn = []
         CloseRequestedFcn = []
     end
@@ -431,6 +432,18 @@ classdef ImageViewWindow < handle
         end
 
         function handleMouseWheel(window, event)
+            window.invokeCallback(window.FocusGainedFcn);
+            modifiers = strings(1, 0);
+            if isprop(event, "Modifier")
+                modifiers = string(event.Modifier);
+            end
+
+            handled = window.invokeCallbackWithOutput( ...
+                window.MouseWheelFcn, false, event.VerticalScrollCount, modifiers);
+            if handled
+                return
+            end
+
             anchorPoint = window.getCurrentAxesPoint();
             if ~window.isPointInsideView(anchorPoint)
                 return
@@ -582,6 +595,17 @@ classdef ImageViewWindow < handle
         function invokeCallback(callback, varargin)
             if ~isempty(callback)
                 callback(varargin{:});
+            end
+        end
+
+        function output = invokeCallbackWithOutput(callback, defaultOutput, varargin)
+            if isempty(callback)
+                output = defaultOutput;
+            else
+                output = callback(varargin{:});
+                if isempty(output)
+                    output = defaultOutput;
+                end
             end
         end
     end

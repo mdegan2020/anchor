@@ -417,6 +417,7 @@ Keyboard shortcuts should work from either image window unless noted otherwise. 
 | `E` | Select the next tiepoint and center both image windows on its coordinates. |
 | `Backspace` | Delete the currently highlighted tiepoint. |
 | `G` | Run local correlation alignment from the focused view and update only the non-focused view. |
+| `R` | Set the non-focused image view from the focused image view using the current homography. |
 
 The `W/A/S/D` nudge size should start as one image pixel at full resolution. Later versions may add a configurable nudge step.
 
@@ -426,6 +427,7 @@ The `W/A/S/D` nudge size should start as one image pixel at full resolution. Lat
 | --- | --- |
 | Left-click-drag image background | Pan/translate the focused image view. |
 | Mouse wheel over image | Zoom in/out around the cursor location. |
+| Mouse wheel while holding `Left Ctrl` | Increase or decrease transparent overlay opacity instead of zooming. |
 | Double left-click image background | Center the clicked image coordinate in the focused image view. |
 | Left-click marker | Select the marker's tiepoint and highlight its row in the table. |
 | Double left-click marker | Select the tiepoint and center the other image window on the corresponding point. |
@@ -455,6 +457,7 @@ Holding `Left Ctrl` in the focused image window should display the non-focused i
 - Initial alignment is translation-only, derived from the highlighted tiepoint.
 - Default overlay opacity is 50%.
 - Pressing `+` or `-` while holding `Left Ctrl` increases or decreases opacity.
+- Using the mouse wheel while holding `Left Ctrl` also adjusts opacity.
 - Right-click-drag translates the overlay interactively.
 - The translation is temporary until `Left Ctrl` is released.
 - On release, the focused image coordinate remains unchanged.

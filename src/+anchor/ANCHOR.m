@@ -128,6 +128,23 @@ classdef ANCHOR < handle
             app.matchView("A", "B");
         end
 
+        function matchOtherViewFromFocused(app, focusedRole)
+            if nargin < 2
+                focusedRole = app.ActiveImageRole;
+            end
+
+            focusedRole = string(focusedRole);
+            app.matchView(focusedRole, app.otherImageRole(focusedRole));
+        end
+
+        function state = getImageViewportState(app, imageRole)
+            state = app.getImageWindow(string(imageRole)).getViewportState();
+        end
+
+        function setImageViewportState(app, imageRole, state)
+            app.getImageWindow(string(imageRole)).setViewportState(state);
+        end
+
         function result = alignOtherViewByLocalCorrelation(app, focusedRole)
             if nargin < 2
                 focusedRole = app.ActiveImageRole;
@@ -191,6 +208,10 @@ classdef ANCHOR < handle
             app.ImageWindowB.KeyPressedFcn = @(key, modifiers) app.handleImageKey("B", key, modifiers);
             app.ImageWindowA.KeyReleasedFcn = @(key, modifiers) app.handleImageKeyRelease("A", key, modifiers);
             app.ImageWindowB.KeyReleasedFcn = @(key, modifiers) app.handleImageKeyRelease("B", key, modifiers);
+            app.ImageWindowA.MouseWheelFcn = @(scrollCount, modifiers) ...
+                app.handleImageMouseWheel("A", scrollCount, modifiers);
+            app.ImageWindowB.MouseWheelFcn = @(scrollCount, modifiers) ...
+                app.handleImageMouseWheel("B", scrollCount, modifiers);
 
             app.ImageWindowA.FocusGainedFcn = @() app.setActiveImageRole("A");
             app.ImageWindowB.FocusGainedFcn = @() app.setActiveImageRole("B");
@@ -255,6 +276,8 @@ classdef ANCHOR < handle
                     app.getImageWindow(imageRole).toggleCrosshair();
                 case "g"
                     app.alignOtherViewByLocalCorrelationInternal(imageRole);
+                case "r"
+                    app.matchOtherViewFromFocused(imageRole);
                 case {"add", "equal", "plus"}
                     if any(modifiers == "control") || app.OverlayMode == "transparent"
                         app.adjustOverlayAlpha(0.05);
@@ -283,6 +306,17 @@ classdef ANCHOR < handle
                     app.endFlickerOverlay();
                 case "control"
                     app.commitTransparentOverlay();
+            end
+        end
+
+        function handled = handleImageMouseWheel(app, imageRole, scrollCount, modifiers)
+            app.setActiveImageRole(imageRole);
+            modifiers = lower(modifiers);
+            handled = false;
+
+            if any(modifiers == "control") || app.OverlayMode == "transparent"
+                app.adjustOverlayAlpha(-0.05 * scrollCount);
+                handled = true;
             end
         end
 
