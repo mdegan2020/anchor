@@ -20,6 +20,8 @@ classdef TiePointTableWindow < handle
         DeleteTiePointRequestedFcn = []
         TiePointSelectedFcn = []
         TiePointEditedFcn = []
+        MatchAFromBRequestedFcn = []
+        MatchBFromARequestedFcn = []
         CloseRequestedFcn = []
     end
 
@@ -109,13 +111,13 @@ classdef TiePointTableWindow < handle
 
             window.MatchAButton = uibutton(window.ToolbarGrid, ...
                 "Text", "A from B", ...
-                "Enable", "off");
+                "ButtonPushedFcn", @(~, ~) window.requestMatchAFromB());
             window.MatchAButton.Layout.Row = 1;
             window.MatchAButton.Layout.Column = 3;
 
             window.MatchBButton = uibutton(window.ToolbarGrid, ...
                 "Text", "B from A", ...
-                "Enable", "off");
+                "ButtonPushedFcn", @(~, ~) window.requestMatchBFromA());
             window.MatchBButton.Layout.Row = 1;
             window.MatchBButton.Layout.Column = 4;
 
@@ -184,6 +186,14 @@ classdef TiePointTableWindow < handle
 
         function requestDeleteTiePoint(window)
             window.invokeCallback(window.DeleteTiePointRequestedFcn);
+        end
+
+        function requestMatchAFromB(window)
+            window.invokeCallback(window.MatchAFromBRequestedFcn);
+        end
+
+        function requestMatchBFromA(window)
+            window.invokeCallback(window.MatchBFromARequestedFcn);
         end
     end
 

@@ -12,10 +12,17 @@ classdef ImageViewWindow < handle
         HeaderGrid
         RoleLabel
         SizeLabel
+        FitButton
         Axes
         ImageHandle
         MarkerHandles = gobjects(0)
         DragTiePointId double = NaN
+        IsPanning (1, 1) logical = false
+        PanStartPoint (1, 2) double = [NaN NaN]
+        PanStartXLim (1, 2) double = [NaN NaN]
+        PanStartYLim (1, 2) double = [NaN NaN]
+        CrosshairVisible (1, 1) logical = false
+        CrosshairHandles = gobjects(0)
     end
 
     properties
@@ -73,10 +80,35 @@ classdef ImageViewWindow < handle
             center = [mean(window.Axes.XLim), mean(window.Axes.YLim)];
         end
 
+        function state = getViewportState(window)
+            state = anchor.ViewportState(window.Axes.XLim, window.Axes.YLim);
+        end
+
+        function setViewportState(window, state)
+            window.setLimits(state.XLim, state.YLim);
+        end
+
         function centerOnPoint(window, point)
             xWidth = diff(window.Axes.XLim);
             yHeight = diff(window.Axes.YLim);
             window.setCenteredLimits(point, xWidth, yHeight);
+        end
+
+        function fitToImage(window)
+            imageSize = window.ImageSource.getImageSize();
+            window.setLimits([0.5, imageSize(2) + 0.5], [0.5, imageSize(1) + 0.5]);
+        end
+
+        function toggleCrosshair(window)
+            window.CrosshairVisible = ~window.CrosshairVisible;
+            window.updateCrosshair();
+        end
+
+        function bringToFront(window)
+            if window.isOpen()
+                figure(window.UIFigure);
+                drawnow;
+            end
         end
 
         function setTiePoints(window, tiePoints, activeId)
@@ -105,7 +137,8 @@ classdef ImageViewWindow < handle
                 "WindowKeyPressFcn", @(~, event) window.handleKeyPress(event), ...
                 "WindowButtonDownFcn", @(~, ~) window.handleWindowButtonDown(), ...
                 "WindowButtonMotionFcn", @(~, ~) window.handleWindowButtonMotion(), ...
-                "WindowButtonUpFcn", @(~, ~) window.handleWindowButtonUp());
+                "WindowButtonUpFcn", @(~, ~) window.handleWindowButtonUp(), ...
+                "WindowScrollWheelFcn", @(~, event) window.handleMouseWheel(event));
 
             window.GridLayout = uigridlayout(window.UIFigure, [2 1]);
             window.GridLayout.RowHeight = {"fit", "1x"};
@@ -113,12 +146,13 @@ classdef ImageViewWindow < handle
             window.GridLayout.Padding = [10 10 10 10];
             window.GridLayout.RowSpacing = 8;
 
-            window.HeaderGrid = uigridlayout(window.GridLayout, [1 2]);
+            window.HeaderGrid = uigridlayout(window.GridLayout, [1 3]);
             window.HeaderGrid.Layout.Row = 1;
             window.HeaderGrid.Layout.Column = 1;
-            window.HeaderGrid.ColumnWidth = {"1x", "fit"};
+            window.HeaderGrid.ColumnWidth = {"1x", "fit", "fit"};
             window.HeaderGrid.RowHeight = {"fit"};
             window.HeaderGrid.Padding = [0 0 0 0];
+            window.HeaderGrid.ColumnSpacing = 8;
 
             window.RoleLabel = uilabel(window.HeaderGrid, ...
                 "Text", "Image " + window.ImageRole, ...
@@ -132,6 +166,12 @@ classdef ImageViewWindow < handle
                 "HorizontalAlignment", "right");
             window.SizeLabel.Layout.Row = 1;
             window.SizeLabel.Layout.Column = 2;
+
+            window.FitButton = uibutton(window.HeaderGrid, ...
+                "Text", "Fit", ...
+                "ButtonPushedFcn", @(~, ~) window.fitToImage());
+            window.FitButton.Layout.Row = 1;
+            window.FitButton.Layout.Column = 3;
 
             window.Axes = uiaxes(window.GridLayout);
             window.Axes.Layout.Row = 2;
@@ -153,8 +193,7 @@ classdef ImageViewWindow < handle
             axis(window.Axes, "image");
 
             imageSize = window.ImageSource.getImageSize();
-            window.Axes.XLim = [0.5, imageSize(2) + 0.5];
-            window.Axes.YLim = [0.5, imageSize(1) + 0.5];
+            window.setLimits([0.5, imageSize(2) + 0.5], [0.5, imageSize(1) + 0.5]);
             title(window.Axes, window.ImageSource.Name, "Interpreter", "none");
         end
 
@@ -211,10 +250,30 @@ classdef ImageViewWindow < handle
 
         function handleWindowButtonDown(window)
             window.invokeCallback(window.FocusGainedFcn);
+
+            if ~isnan(window.DragTiePointId) || string(window.UIFigure.SelectionType) ~= "normal"
+                return
+            end
+
+            point = window.getCurrentImagePoint();
+            if ~window.isPointInsideView(point)
+                return
+            end
+
+            window.IsPanning = true;
+            window.PanStartPoint = point;
+            window.PanStartXLim = window.Axes.XLim;
+            window.PanStartYLim = window.Axes.YLim;
         end
 
         function handleWindowButtonMotion(window)
             if isnan(window.DragTiePointId)
+                if window.IsPanning
+                    currentPoint = window.getCurrentImagePoint();
+                    delta = currentPoint - window.PanStartPoint;
+                    window.setLimits(window.PanStartXLim - delta(1), ...
+                        window.PanStartYLim - delta(2));
+                end
                 return
             end
 
@@ -224,6 +283,7 @@ classdef ImageViewWindow < handle
 
         function handleWindowButtonUp(window)
             window.DragTiePointId = NaN;
+            window.IsPanning = false;
         end
 
         function handleKeyPress(window, event)
@@ -237,6 +297,15 @@ classdef ImageViewWindow < handle
             else
                 window.invokeCallback(window.CloseRequestedFcn);
             end
+        end
+
+        function handleMouseWheel(window, event)
+            anchorPoint = window.getCurrentImagePoint();
+            zoomFactor = 1.2 ^ event.VerticalScrollCount;
+            newWidth = diff(window.Axes.XLim) * zoomFactor;
+            newHeight = diff(window.Axes.YLim) * zoomFactor;
+
+            window.setCenteredLimits(anchorPoint, newWidth, newHeight);
         end
 
         function point = getCurrentImagePoint(window)
@@ -255,11 +324,29 @@ classdef ImageViewWindow < handle
             imageSize = window.ImageSource.getImageSize();
             point = window.clampPoint(point);
 
+            xWidth = min(max(xWidth, 1), imageSize(2));
+            yHeight = min(max(yHeight, 1), imageSize(1));
+
             halfWidth = xWidth / 2;
             halfHeight = yHeight / 2;
 
             xLimits = [point(1) - halfWidth, point(1) + halfWidth];
             yLimits = [point(2) - halfHeight, point(2) + halfHeight];
+
+            window.setLimits(xLimits, yLimits);
+        end
+
+        function setLimits(window, xLimits, yLimits)
+            imageSize = window.ImageSource.getImageSize();
+            xLimits = sort(xLimits);
+            yLimits = sort(yLimits);
+
+            if diff(xLimits) >= imageSize(2)
+                xLimits = [0.5, imageSize(2) + 0.5];
+            end
+            if diff(yLimits) >= imageSize(1)
+                yLimits = [0.5, imageSize(1) + 0.5];
+            end
 
             if xLimits(1) < 0.5
                 xLimits = xLimits + (0.5 - xLimits(1));
@@ -276,6 +363,40 @@ classdef ImageViewWindow < handle
 
             window.Axes.XLim = xLimits;
             window.Axes.YLim = yLimits;
+            window.updateCrosshair();
+        end
+
+        function tf = isPointInsideView(window, point)
+            tf = point(1) >= window.Axes.XLim(1) && point(1) <= window.Axes.XLim(2) && ...
+                point(2) >= window.Axes.YLim(1) && point(2) <= window.Axes.YLim(2);
+        end
+
+        function updateCrosshair(window)
+            validHandles = window.CrosshairHandles(isvalid(window.CrosshairHandles));
+
+            if ~window.CrosshairVisible
+                delete(validHandles);
+                window.CrosshairHandles = gobjects(0);
+                return
+            end
+
+            center = window.getViewCenter();
+            if numel(validHandles) ~= 2
+                delete(validHandles);
+                hold(window.Axes, "on");
+                horizontal = plot(window.Axes, window.Axes.XLim, [center(2) center(2)], ...
+                    "y-", "LineWidth", 0.8, "HitTest", "off", "PickableParts", "none");
+                vertical = plot(window.Axes, [center(1) center(1)], window.Axes.YLim, ...
+                    "y-", "LineWidth", 0.8, "HitTest", "off", "PickableParts", "none");
+                hold(window.Axes, "off");
+                window.CrosshairHandles = [horizontal vertical];
+                return
+            end
+
+            validHandles(1).XData = window.Axes.XLim;
+            validHandles(1).YData = [center(2) center(2)];
+            validHandles(2).XData = [center(1) center(1)];
+            validHandles(2).YData = window.Axes.YLim;
         end
     end
 

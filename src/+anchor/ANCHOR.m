@@ -5,6 +5,7 @@ classdef ANCHOR < handle
         ImageSourceA
         ImageSourceB
         TiePointStore
+        HomographyModel
         CsvWriter
         ImageWindowA
         ImageWindowB
@@ -25,6 +26,7 @@ classdef ANCHOR < handle
             app.ImageSourceA = anchor.ANCHOR.asImageSource(imageA, "Image A");
             app.ImageSourceB = anchor.ANCHOR.asImageSource(imageB, "Image B");
             app.TiePointStore = anchor.TiePointStore();
+            app.HomographyModel = anchor.HomographyModel();
             app.CsvWriter = anchor.CsvTiePointWriter();
 
             positions = anchor.ANCHOR.defaultWindowPositions();
@@ -102,6 +104,22 @@ classdef ANCHOR < handle
         function data = getTiePointTable(app)
             data = app.TiePointStore.toTable();
         end
+
+        function transformType = getTransformType(app)
+            transformType = app.HomographyModel.TransformType;
+        end
+
+        function matchImageAViewFromB(app)
+            app.matchView("B", "A");
+        end
+
+        function matchImageBViewFromA(app)
+            app.matchView("A", "B");
+        end
+
+        function imageRole = getActiveImageRole(app)
+            imageRole = app.ActiveImageRole;
+        end
     end
 
     methods (Access = private)
@@ -111,6 +129,8 @@ classdef ANCHOR < handle
             app.TableWindow.TiePointSelectedFcn = @(id) app.selectTiePoint(id);
             app.TableWindow.TiePointEditedFcn = @(id, fieldName, value) ...
                 app.updateTiePointField(id, fieldName, value);
+            app.TableWindow.MatchAFromBRequestedFcn = @() app.matchImageAViewFromB();
+            app.TableWindow.MatchBFromARequestedFcn = @() app.matchImageBViewFromA();
             app.TableWindow.CloseRequestedFcn = @() app.closeApplication();
 
             app.ImageWindowA.CenteredTiePointRequestedFcn = @() app.createCenteredTiePoint();
@@ -179,6 +199,10 @@ classdef ANCHOR < handle
                     app.nudgeActivePoint(imageRole, [0 1]);
                 case "d"
                     app.nudgeActivePoint(imageRole, [1 0]);
+                case "f"
+                    app.toggleImageFocus(imageRole);
+                case "c"
+                    app.getImageWindow(imageRole).toggleCrosshair();
                 case "q"
                     app.TiePointStore.selectPrevious();
                     app.centerWindowsOnActiveTiePoint();
@@ -222,8 +246,13 @@ classdef ANCHOR < handle
         end
 
         function persistAndRefresh(app)
+            app.updateHomography();
             app.writeCsvIfReady();
             app.refreshTiePointViews();
+        end
+
+        function updateHomography(app)
+            app.HomographyModel.update(app.TiePointStore.toTable());
         end
 
         function writeCsvIfReady(app)
@@ -245,6 +274,25 @@ classdef ANCHOR < handle
             delete(app);
         end
 
+        function matchView(app, sourceRole, targetRole)
+            sourceWindow = app.getImageWindow(sourceRole);
+            targetWindow = app.getImageWindow(targetRole);
+            targetState = app.HomographyModel.mapViewport( ...
+                sourceWindow.getViewportState(), sourceRole, targetRole);
+            targetWindow.setViewportState(targetState);
+        end
+
+        function toggleImageFocus(app, sourceRole)
+            if sourceRole == "A"
+                targetRole = "B";
+            else
+                targetRole = "A";
+            end
+
+            app.setActiveImageRole(targetRole);
+            app.getImageWindow(targetRole).bringToFront();
+        end
+
         function refreshTiePointViews(app)
             tiePoints = app.TiePointStore.toTable();
             activeId = app.TiePointStore.getActiveId();
@@ -252,6 +300,17 @@ classdef ANCHOR < handle
             app.TableWindow.setTiePoints(tiePoints, activeId);
             app.ImageWindowA.setTiePoints(tiePoints, activeId);
             app.ImageWindowB.setTiePoints(tiePoints, activeId);
+        end
+
+        function window = getImageWindow(app, imageRole)
+            if imageRole == "A"
+                window = app.ImageWindowA;
+            elseif imageRole == "B"
+                window = app.ImageWindowB;
+            else
+                error("anchor:ANCHOR:InvalidImageRole", ...
+                    "Image role must be ""A"" or ""B"".");
+            end
         end
     end
 

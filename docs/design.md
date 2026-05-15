@@ -274,7 +274,8 @@ The transform fallback rules should be deterministic:
 - 0 tiepoints: identity transform.
 - 1 tiepoint: constant shift from the image A point to the image B point.
 - 2 tiepoints: average shift from the two point-pair deltas.
-- 3 or more tiepoints: attempt to compute the full homography.
+- 3 tiepoints: estimate an affine transform.
+- 4 or more tiepoints: attempt to compute the full projective homography.
 
 If full homography estimation fails because the points are degenerate, ANCHOR should retain the current valid estimate or fall back to average shift.
 
@@ -626,4 +627,4 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 
 ## Proposed Next Step
 
-Proceed to Milestone 4: implement `HomographyModel`, make `ViewportState` explicit enough for view transfer, and add the table-window buttons that set image A from image B and image B from image A.
+Proceed to Milestone 6: implement `Shift` flicker overlay and `Left Ctrl` transparent overlay modes, including temporary translation state and commit-on-release behavior for the non-focused tiepoint coordinate.
