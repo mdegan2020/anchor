@@ -9,6 +9,10 @@ classdef HomographyModel < handle
 
     methods
         function update(model, tiePoints)
+            if ~isempty(tiePoints) && any(string(tiePoints.Properties.VariableNames) == "Enabled")
+                tiePoints = tiePoints(tiePoints.Enabled, :);
+            end
+
             if isempty(tiePoints) || height(tiePoints) == 0
                 model.setTransform(eye(3), "identity");
                 return

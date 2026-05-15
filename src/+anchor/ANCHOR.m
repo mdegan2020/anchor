@@ -145,6 +145,12 @@ classdef ANCHOR < handle
             app.getImageWindow(string(imageRole)).setViewportState(state);
         end
 
+        function selectAndCenterTiePoint(app, id)
+            app.TiePointStore.selectTiePoint(id);
+            app.centerWindowsOnActiveTiePoint();
+            app.refreshTiePointViews();
+        end
+
         function result = alignOtherViewByLocalCorrelation(app, focusedRole)
             if nargin < 2
                 focusedRole = app.ActiveImageRole;
@@ -184,6 +190,7 @@ classdef ANCHOR < handle
             app.TableWindow.AddTiePointRequestedFcn = @() app.createCenteredTiePoint();
             app.TableWindow.DeleteTiePointRequestedFcn = @() app.deleteActiveTiePointInternal();
             app.TableWindow.TiePointSelectedFcn = @(id) app.selectTiePoint(id);
+            app.TableWindow.TiePointCenteredFcn = @(id) app.selectAndCenterTiePoint(id);
             app.TableWindow.TiePointEditedFcn = @(id, fieldName, value) ...
                 app.updateTiePointField(id, fieldName, value);
             app.TableWindow.MatchAFromBRequestedFcn = @() app.matchImageAViewFromB();

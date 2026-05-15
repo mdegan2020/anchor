@@ -224,7 +224,8 @@ classdef ImageViewWindow < handle
                 end
 
                 isActive = id == activeId;
-                window.addMarker(id, point, isActive);
+                isEnabled = tiePoints.Enabled(rowIndex);
+                window.addMarker(id, point, isActive, isEnabled);
             end
         end
     end
@@ -299,13 +300,19 @@ classdef ImageViewWindow < handle
             title(window.Axes, window.ImageSource.Name, "Interpreter", "none");
         end
 
-        function addMarker(window, id, point, isActive)
-            if isActive
+        function addMarker(window, id, point, isActive, isEnabled)
+            if ~isEnabled
+                markerColor = [1.0 0.1 0.1];
+            elseif isActive
                 markerColor = [1.0 0.85 0.1];
+            else
+                markerColor = [0.1 0.8 1.0];
+            end
+
+            if isActive
                 markerSize = 12;
                 lineWidth = 2.0;
             else
-                markerColor = [0.1 0.8 1.0];
                 markerSize = 9;
                 lineWidth = 1.5;
             end

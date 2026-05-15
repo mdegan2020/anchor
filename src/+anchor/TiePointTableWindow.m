@@ -21,6 +21,7 @@ classdef TiePointTableWindow < handle
         AddTiePointRequestedFcn = []
         DeleteTiePointRequestedFcn = []
         TiePointSelectedFcn = []
+        TiePointCenteredFcn = []
         TiePointEditedFcn = []
         MatchAFromBRequestedFcn = []
         MatchBFromARequestedFcn = []
@@ -188,6 +189,9 @@ classdef TiePointTableWindow < handle
             end
 
             window.invokeCallback(window.TiePointSelectedFcn, data.Id(rowIndex));
+            if size(event.Indices, 2) >= 2 && event.Indices(2) == 1
+                window.invokeCallback(window.TiePointCenteredFcn, data.Id(rowIndex));
+            end
         end
 
         function handleCellEdit(window, event)

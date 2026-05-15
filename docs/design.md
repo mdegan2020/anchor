@@ -205,6 +205,7 @@ Responsibilities:
 - Convert between screen/display coordinates and full-resolution image coordinates.
 - Draw tiepoint markers for this image. Markers should be an `X` with a small circle and no visible text label.
 - Highlight the active tiepoint.
+- Render disabled tiepoints in red.
 - Emit point-pick, marker-select, marker-move, and viewport-change events.
 - Emit keyboard command events for app-level shortcuts.
 - Support crosshair display as per-window state.
@@ -266,7 +267,7 @@ Responsibilities:
 
 - Store the current image A-to-image B and image B-to-image A transforms.
 - Initialize as identity because the first assumption is that the images are already registered.
-- Re-estimate the transform from all current tiepoints after point creation, movement, or deletion.
+- Re-estimate the transform from all enabled tiepoints after point creation, movement, enable/disable, or deletion.
 - Provide view transfer helpers used by table-window buttons.
 - Provide region mapping helpers used by overlay and local correlation workflows.
 
@@ -278,7 +279,7 @@ The transform fallback rules should be deterministic:
 - 3 tiepoints: estimate an affine transform.
 - 4 or more tiepoints: attempt to compute the full projective homography.
 
-If full homography estimation fails because the points are degenerate, ANCHOR should retain the current valid estimate or fall back to average shift.
+Disabled tiepoints remain visible and are still written to CSV, but they are excluded from homography estimation. If full homography estimation fails because the enabled points are degenerate, ANCHOR should retain the current valid estimate or fall back to average shift.
 
 ### `LocalRegistrationEstimator`
 
@@ -505,6 +506,7 @@ Important user actions should flow through the controller:
 | User action | Origin | Controller response |
 | --- | --- | --- |
 | Select table row | Table window | Set active tiepoint in store; refresh image highlights |
+| Select table point id | Table window | Set active tiepoint; center both image windows on its coordinates |
 | Add centered tiepoint | Table or image window | Query both view centers; create complete tiepoint; select it; update homography and CSV |
 | Select marker | Image window | Set active tiepoint id; highlight table row and both markers |
 | Double-click marker | Image window | Select tiepoint; center the other image window on the corresponding coordinate |
@@ -512,7 +514,7 @@ Important user actions should flow through the controller:
 | Nudge marker | Image window shortcut | Move active coordinate in focused window; update homography and CSV |
 | Delete tiepoint | Table or shortcut | Remove whole tiepoint pair; choose next selection; update homography and CSV |
 | Edit table coordinate | Table window | Update one coordinate in store; update marker, homography, and CSV |
-| Edit enabled/notes field | Table window | Update store and CSV; enabled state is written but homography still uses all points |
+| Edit enabled/notes field | Table window | Update store and CSV; disabled points are excluded from homography estimation |
 | Match A view from B | Table window | Query B viewport; transform through homography; set A viewport |
 | Match B view from A | Table window | Query A viewport; transform through homography; set B viewport |
 | Toggle focus | Image window shortcut | Bring the other image window forward |

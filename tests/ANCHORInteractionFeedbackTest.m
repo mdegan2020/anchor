@@ -57,6 +57,23 @@ classdef ANCHORInteractionFeedbackTest < matlab.unittest.TestCase
             testCase.verifyEqual(targetState.XLim, sourceState.XLim, AbsTol=1e-12);
             testCase.verifyEqual(targetState.YLim, sourceState.YLim, AbsTol=1e-12);
         end
+
+        function selectAndCenterTiePointCentersBothViews(testCase)
+            app = anchor.ANCHOR(rand(120, 140), rand(120, 140));
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteHandle(app));
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteFile( ...
+                fullfile(pwd, "anchor_tiepoints.csv")));
+            app.setImageViewportState("A", anchor.ViewportState([10.5 40.5], [10.5 40.5]));
+            app.setImageViewportState("B", anchor.ViewportState([20.5 50.5], [20.5 50.5]));
+            id = app.createTiePointAtViewCenters();
+            app.setImageViewportState("A", anchor.ViewportState([70.5 100.5], [70.5 100.5]));
+            app.setImageViewportState("B", anchor.ViewportState([80.5 110.5], [80.5 110.5]));
+
+            app.selectAndCenterTiePoint(id);
+
+            testCase.verifyEqual(app.getImageViewportState("A").getCenter(), [25.5 25.5], AbsTol=1e-12);
+            testCase.verifyEqual(app.getImageViewportState("B").getCenter(), [35.5 35.5], AbsTol=1e-12);
+        end
     end
 
     methods (Static, Access = private)
