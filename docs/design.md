@@ -401,7 +401,7 @@ Keyboard shortcuts should work from either image window unless noted otherwise. 
 | `Shift` hold | Flicker the non-focused image as a translated overlay in the focused image window, aligned by the highlighted tiepoint. |
 | `Left Ctrl` hold | Show the non-focused image as a transparent translated overlay in the focused image window. |
 | `Q` | Select the previous tiepoint and center both image windows on its coordinates. |
-| `R` | Select the next tiepoint and center both image windows on its coordinates. |
+| `E` | Select the next tiepoint and center both image windows on its coordinates. |
 | `Backspace` | Delete the currently highlighted tiepoint. |
 | `G` | Run local correlation alignment from the focused view and update only the non-focused view. |
 
@@ -411,12 +411,15 @@ The `W/A/S/D` nudge size should start as one image pixel at full resolution. Lat
 
 | Interaction | Behavior |
 | --- | --- |
+| Left-click-drag image background | Pan/translate the focused image view. |
+| Mouse wheel over image | Zoom in/out around the cursor location. |
+| Double left-click image background | Center or zoom the focused image view using normal image-viewer behavior, to be refined during implementation. |
 | Left-click marker | Select the marker's tiepoint and highlight its row in the table. |
 | Double left-click marker | Select the tiepoint and center the other image window on the corresponding point. |
 | Left-click-drag marker | Move the marker in the focused image window and update only that image coordinate. |
 | Right-click-drag while holding `Left Ctrl` | Translate the transparent overlay of the non-focused image. |
 
-Marker movement must update the model through the controller, not directly from the image window.
+Default mouse behavior should feel like a typical image viewer unless overridden by a marker or overlay interaction. Marker movement must update the model through the controller, not directly from the image window.
 
 ## Overlay Alignment Modes
 
@@ -576,7 +579,7 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 - Preserve full-resolution coordinates while viewing decimated imagery.
 - Add image A/image B focus toggling with `F`.
 - Add crosshair toggling with `C`.
-- Add previous/next tiepoint navigation with `Q` and `R`.
+- Add previous/next tiepoint navigation with `Q` and `E`.
 
 ### Milestone 6: Overlay Alignment Modes
 
