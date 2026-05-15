@@ -61,7 +61,7 @@ classdef TiePointTableWindow < handle
         end
 
         function setTiePoints(window, tiePoints, activeId)
-            window.Table.Data = tiePoints;
+            window.Table.Data = anchor.TiePointTableWindow.formatTiePointTable(tiePoints);
             if height(tiePoints) == 0
                 window.Table.ColumnEditable = false(1, 7);
             else
@@ -206,9 +206,20 @@ classdef TiePointTableWindow < handle
             if columnIndex < 1 || columnIndex > numel(fieldNames)
                 return
             end
+            fieldName = fieldNames(columnIndex);
+
+            if any(fieldName == ["A_X", "A_Y", "B_X", "B_Y"])
+                value = str2double(string(event.NewData));
+                if ~isfinite(value)
+                    window.restoreEditedCell(rowIndex, fieldName, event.PreviousData);
+                    return
+                end
+            else
+                value = event.NewData;
+            end
 
             window.invokeCallback(window.TiePointEditedFcn, ...
-                data.Id(rowIndex), fieldNames(columnIndex), event.NewData);
+                data.Id(rowIndex), fieldName, value);
         end
 
         function handleKeyPress(window, event)
@@ -248,6 +259,12 @@ classdef TiePointTableWindow < handle
         function requestLoadSession(window)
             window.invokeCallback(window.LoadSessionRequestedFcn);
         end
+
+        function restoreEditedCell(window, rowIndex, fieldName, previousData)
+            data = window.Table.Data;
+            data.(fieldName)(rowIndex) = string(previousData);
+            window.Table.Data = data;
+        end
     end
 
     methods (Access = private, Static)
@@ -256,6 +273,29 @@ classdef TiePointTableWindow < handle
                 "Size", [0 7], ...
                 "VariableTypes", ["double", "double", "double", "double", "double", "logical", "string"], ...
                 "VariableNames", ["Id", "A_X", "A_Y", "B_X", "B_Y", "Enabled", "Notes"]);
+        end
+
+        function data = formatTiePointTable(tiePoints)
+            data = tiePoints;
+            data.A_X = anchor.TiePointTableWindow.formatCoordinateColumn(tiePoints.A_X);
+            data.A_Y = anchor.TiePointTableWindow.formatCoordinateColumn(tiePoints.A_Y);
+            data.B_X = anchor.TiePointTableWindow.formatCoordinateColumn(tiePoints.B_X);
+            data.B_Y = anchor.TiePointTableWindow.formatCoordinateColumn(tiePoints.B_Y);
+        end
+
+        function values = formatCoordinateColumn(values)
+            formattedValues = strings(size(values));
+            for index = 1:numel(values)
+                formattedValues(index) = ...
+                    anchor.TiePointTableWindow.formatCoordinate(values(index));
+            end
+            values = formattedValues;
+        end
+
+        function text = formatCoordinate(value)
+            text = string(sprintf("%.10f", value));
+            text = regexprep(text, "(\.\d*?)0+$", "$1");
+            text = regexprep(text, "\.$", "");
         end
 
         function invokeCallback(callback, varargin)

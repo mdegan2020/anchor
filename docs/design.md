@@ -338,6 +338,7 @@ Tiepoints should be stored as intrinsic image coordinates:
 - `y` increases downward.
 - Coordinate `[1, 1]` refers to the center of the first pixel, matching MATLAB image intrinsic coordinate conventions.
 - Display decimation, pyramid levels, pan, and zoom must not change stored coordinates.
+- Image coordinates should be displayed and exported in fixed decimal notation, not scientific notation.
 
 This keeps manual picks stable even if the rendering backend changes.
 

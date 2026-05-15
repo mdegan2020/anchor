@@ -36,17 +36,9 @@ classdef CsvTiePointWriter < handle
         end
 
         function write(writer, tiePoints, sourceA, sourceB)
-            outputTable = table( ...
-                repmat(sourceA.Name, height(tiePoints), 1), ...
-                tiePoints.A_X, tiePoints.A_Y, ...
-                repmat(sourceB.Name, height(tiePoints), 1), ...
-                tiePoints.B_X, tiePoints.B_Y, ...
-                double(tiePoints.Enabled), ...
-                'VariableNames', {'fname1', 'ix1', 'iy1', 'fname2', 'ix2', 'iy2', 'enabled'});
-
             tempPath = writer.OutputPath + ".tmp";
             try
-                writetable(outputTable, tempPath, 'FileType', 'text');
+                writer.writeCsvFile(tempPath, tiePoints, sourceA, sourceB);
                 movefile(tempPath, writer.OutputPath, 'f');
                 writer.HasUnsavedChanges = false;
                 writer.LastErrorMessage = "";
@@ -54,6 +46,51 @@ classdef CsvTiePointWriter < handle
                 writer.HasUnsavedChanges = true;
                 writer.LastErrorMessage = string(err.message);
                 rethrow(err);
+            end
+        end
+    end
+
+    methods (Access = private)
+        function writeCsvFile(writer, outputPath, tiePoints, sourceA, sourceB)
+            fileId = fopen(outputPath, "w");
+            if fileId < 0
+                error("anchor:CsvTiePointWriter:OpenFailed", ...
+                    "Unable to open CSV file '%s' for writing.", outputPath);
+            end
+
+            cleanup = onCleanup(@() fclose(fileId));
+            fprintf(fileId, "fname1,ix1,iy1,fname2,ix2,iy2,enabled\n");
+
+            for rowIndex = 1:height(tiePoints)
+                fprintf(fileId, "%s,%s,%s,%s,%s,%s,%d\n", ...
+                    writer.escapeCsvText(sourceA.Name), ...
+                    writer.formatCoordinate(tiePoints.A_X(rowIndex)), ...
+                    writer.formatCoordinate(tiePoints.A_Y(rowIndex)), ...
+                    writer.escapeCsvText(sourceB.Name), ...
+                    writer.formatCoordinate(tiePoints.B_X(rowIndex)), ...
+                    writer.formatCoordinate(tiePoints.B_Y(rowIndex)), ...
+                    tiePoints.Enabled(rowIndex));
+            end
+        end
+    end
+
+    methods (Access = private, Static)
+        function text = formatCoordinate(value)
+            text = string(sprintf("%.10f", value));
+            text = regexprep(text, "(\.\d*?)0+$", "$1");
+            text = regexprep(text, "\.$", "");
+        end
+
+        function text = escapeCsvText(value)
+            text = string(value);
+            quote = string('"');
+
+            if contains(text, quote)
+                text = replace(text, quote, quote + quote);
+            end
+
+            if any(contains(text, [",", newline, char(13)]))
+                text = quote + text + quote;
             end
         end
     end
