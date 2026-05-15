@@ -95,9 +95,38 @@ classdef ANCHORInteractionFeedbackTest < matlab.unittest.TestCase
             testCase.verifyEqual(displayTable.DY, displayTable.A_Y - displayTable.B_Y, AbsTol=1e-12);
             testCase.verifyEqual(height(displayTable), height(tiePoints) + 1);
         end
+
+        function filterWorstTiePointDisablesLargestLeaveOneOutResidual(testCase)
+            app = anchor.ANCHOR(rand(600, 600), rand(600, 600));
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteHandle(app));
+            testCase.addTeardown(@() ANCHORInteractionFeedbackTest.deleteFile( ...
+                fullfile(pwd, "anchor_tiepoints.csv")));
+            ANCHORInteractionFeedbackTest.createTiePoint(app, [10 10], [20 30]);
+            ANCHORInteractionFeedbackTest.createTiePoint(app, [30 10], [40 30]);
+            outlierId = ANCHORInteractionFeedbackTest.createTiePoint(app, [10 30], [500 500]);
+
+            disabledId = app.filterWorstTiePoint();
+            tiePoints = app.getTiePointTable();
+            outlierRow = tiePoints.Id == outlierId;
+            app.setImageViewportState("A", anchor.ViewportState([95 105], [95 105]));
+            app.matchOtherViewFromFocused("A");
+
+            testCase.verifyEqual(disabledId, outlierId);
+            testCase.verifyFalse(tiePoints.Enabled(outlierRow));
+            testCase.verifyEqual(app.getTransformType(), "shift");
+            testCase.verifyEqual(app.getImageViewportState("B").getCenter(), [110 120], AbsTol=1e-12);
+        end
     end
 
     methods (Static, Access = private)
+        function id = createTiePoint(app, pointA, pointB)
+            app.setImageViewportState("A", anchor.ViewportState( ...
+                pointA(1) + [-5 5], pointA(2) + [-5 5]));
+            app.setImageViewportState("B", anchor.ViewportState( ...
+                pointB(1) + [-5 5], pointB(2) + [-5 5]));
+            id = app.createTiePointAtViewCenters();
+        end
+
         function fraction = viewFraction(viewportState, point)
             fraction = [ ...
                 (point(1) - viewportState.XLim(1)) / viewportState.getWidth(), ...

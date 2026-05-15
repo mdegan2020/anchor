@@ -385,6 +385,7 @@ The core workflow should make point creation deliberate: view-alignment aids hel
 - Add centered tiepoint.
 - Delete highlighted tiepoint.
 - Enable/disable highlighted tiepoint.
+- Filter tiepoints by disabling the point with the largest leave-one-out residual.
 - Save/load session.
 - Choose or show CSV output path.
 - Set image A view from current image B view using the homography.
@@ -518,6 +519,7 @@ Important user actions should flow through the controller:
 | Delete tiepoint | Table or shortcut | Remove whole tiepoint pair; choose next selection; update homography and CSV |
 | Edit table coordinate | Table window | Update one coordinate in store; update marker, homography, and CSV |
 | Edit enabled/notes field | Table window | Update store and CSV; disabled points are excluded from homography estimation |
+| Filter tiepoints | Table window | Compute leave-one-out residuals over enabled points; disable the worst point; recompute homography and CSV |
 | Match A view from B | Table window | Query B viewport; transform through homography; set A viewport |
 | Match B view from A | Table window | Query A viewport; transform through homography; set B viewport |
 | Toggle focus | Image window shortcut | Bring the other image window forward |
@@ -566,6 +568,7 @@ Early tests should focus on non-UI behavior:
 - Converting model data to a table.
 - Updating homography state after tiepoint edits.
 - Excluding disabled tiepoints from homography estimation.
+- Filtering the largest leave-one-out residual by disabling that tiepoint.
 - Computing table diagnostics such as `DX`, `DY`, and residual fit error.
 - Mapping viewport centers/extents through the homography.
 - Writing CSV output with the expected schema, including `enabled` as `1` or `0`.

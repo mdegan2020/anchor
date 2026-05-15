@@ -10,6 +10,7 @@ classdef TiePointTableWindow < handle
         ToolbarGrid
         AddButton
         DeleteButton
+        FilterButton
         MatchAButton
         MatchBButton
         SaveSessionButton
@@ -20,6 +21,7 @@ classdef TiePointTableWindow < handle
     properties
         AddTiePointRequestedFcn = []
         DeleteTiePointRequestedFcn = []
+        FilterTiePointsRequestedFcn = []
         TiePointSelectedFcn = []
         TiePointCenteredFcn = []
         TiePointEditedFcn = []
@@ -122,10 +124,10 @@ classdef TiePointTableWindow < handle
             window.GridLayout.Padding = [10 10 10 10];
             window.GridLayout.RowSpacing = 8;
 
-            window.ToolbarGrid = uigridlayout(window.GridLayout, [1 7]);
+            window.ToolbarGrid = uigridlayout(window.GridLayout, [1 8]);
             window.ToolbarGrid.Layout.Row = 1;
             window.ToolbarGrid.Layout.Column = 1;
-            window.ToolbarGrid.ColumnWidth = {"fit", "fit", "fit", "fit", "fit", "fit", "1x"};
+            window.ToolbarGrid.ColumnWidth = {"fit", "fit", "fit", "fit", "fit", "fit", "fit", "1x"};
             window.ToolbarGrid.RowHeight = {"fit"};
             window.ToolbarGrid.Padding = [0 0 0 0];
             window.ToolbarGrid.ColumnSpacing = 8;
@@ -143,29 +145,35 @@ classdef TiePointTableWindow < handle
             window.DeleteButton.Layout.Row = 1;
             window.DeleteButton.Layout.Column = 2;
 
+            window.FilterButton = uibutton(window.ToolbarGrid, ...
+                "Text", "filter", ...
+                "ButtonPushedFcn", @(~, ~) window.requestFilterTiePoints());
+            window.FilterButton.Layout.Row = 1;
+            window.FilterButton.Layout.Column = 3;
+
             window.MatchAButton = uibutton(window.ToolbarGrid, ...
                 "Text", "A from B", ...
                 "ButtonPushedFcn", @(~, ~) window.requestMatchAFromB());
             window.MatchAButton.Layout.Row = 1;
-            window.MatchAButton.Layout.Column = 3;
+            window.MatchAButton.Layout.Column = 4;
 
             window.MatchBButton = uibutton(window.ToolbarGrid, ...
                 "Text", "B from A", ...
                 "ButtonPushedFcn", @(~, ~) window.requestMatchBFromA());
             window.MatchBButton.Layout.Row = 1;
-            window.MatchBButton.Layout.Column = 4;
+            window.MatchBButton.Layout.Column = 5;
 
             window.SaveSessionButton = uibutton(window.ToolbarGrid, ...
                 "Text", "Save Session", ...
                 "ButtonPushedFcn", @(~, ~) window.requestSaveSession());
             window.SaveSessionButton.Layout.Row = 1;
-            window.SaveSessionButton.Layout.Column = 5;
+            window.SaveSessionButton.Layout.Column = 6;
 
             window.LoadSessionButton = uibutton(window.ToolbarGrid, ...
                 "Text", "Load Session", ...
                 "ButtonPushedFcn", @(~, ~) window.requestLoadSession());
             window.LoadSessionButton.Layout.Row = 1;
-            window.LoadSessionButton.Layout.Column = 6;
+            window.LoadSessionButton.Layout.Column = 7;
 
             window.Table = uitable(window.GridLayout);
             window.Table.Layout.Row = 2;
@@ -251,6 +259,10 @@ classdef TiePointTableWindow < handle
 
         function requestDeleteTiePoint(window)
             window.invokeCallback(window.DeleteTiePointRequestedFcn);
+        end
+
+        function requestFilterTiePoints(window)
+            window.invokeCallback(window.FilterTiePointsRequestedFcn);
         end
 
         function requestMatchAFromB(window)

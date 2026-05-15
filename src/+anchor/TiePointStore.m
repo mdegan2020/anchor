@@ -112,6 +112,10 @@ classdef TiePointStore < handle
             store.ActiveId = id;
         end
 
+        function disableTiePoint(store, id)
+            store.updateField(id, "Enabled", false);
+        end
+
         function nudgeActivePoint(store, imageRole, delta)
             if ~store.hasActiveTiePoint()
                 return

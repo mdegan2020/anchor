@@ -112,6 +112,10 @@ classdef ANCHOR < handle
             app.deleteActiveTiePointInternal();
         end
 
+        function disabledId = filterWorstTiePoint(app)
+            disabledId = app.filterWorstTiePointInternal();
+        end
+
         function data = getTiePointTable(app)
             data = app.TiePointStore.toTable();
         end
@@ -193,6 +197,7 @@ classdef ANCHOR < handle
         function wireCallbacks(app)
             app.TableWindow.AddTiePointRequestedFcn = @() app.createCenteredTiePoint();
             app.TableWindow.DeleteTiePointRequestedFcn = @() app.deleteActiveTiePointInternal();
+            app.TableWindow.FilterTiePointsRequestedFcn = @() app.filterWorstTiePointInternal();
             app.TableWindow.TiePointSelectedFcn = @(id) app.selectTiePoint(id);
             app.TableWindow.TiePointCenteredFcn = @(id) app.selectAndCenterTiePoint(id);
             app.TableWindow.TiePointEditedFcn = @(id, fieldName, value) ...
@@ -371,6 +376,33 @@ classdef ANCHOR < handle
 
         function updateHomography(app)
             app.HomographyModel.update(app.TiePointStore.toTable());
+        end
+
+        function disabledId = filterWorstTiePointInternal(app)
+            tiePoints = app.TiePointStore.toTable();
+            enabledTiePoints = tiePoints(tiePoints.Enabled, :);
+            disabledId = NaN;
+
+            if height(enabledTiePoints) < 2
+                return
+            end
+
+            residuals = zeros(height(enabledTiePoints), 1);
+            for rowIndex = 1:height(enabledTiePoints)
+                fitTiePoints = enabledTiePoints;
+                omittedTiePoint = fitTiePoints(rowIndex, :);
+                fitTiePoints(rowIndex, :) = [];
+
+                fitModel = anchor.HomographyModel();
+                fitModel.update(fitTiePoints);
+                residuals(rowIndex) = fitModel.computeResiduals(omittedTiePoint);
+            end
+
+            [~, worstIndex] = max(residuals);
+            disabledId = enabledTiePoints.Id(worstIndex);
+            app.TiePointStore.disableTiePoint(disabledId);
+            app.TiePointStore.selectTiePoint(disabledId);
+            app.persistAndRefresh();
         end
 
         function markCsvDirty(app)
