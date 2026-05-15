@@ -11,6 +11,11 @@ classdef ANCHOR < handle
         ImageWindowB
         TableWindow
         ActiveImageRole (1, 1) string = "A"
+        OverlayMode (1, 1) string = "none"
+        OverlayFocusedRole (1, 1) string = "A"
+        OverlayOtherRole (1, 1) string = "B"
+        OverlayTiePointId double = NaN
+        OverlayAlpha (1, 1) double = 0.5
         IsClosing (1, 1) logical = false
     end
 
@@ -145,8 +150,10 @@ classdef ANCHOR < handle
             app.ImageWindowA.MarkerDoubleClickedFcn = @(id) app.centerOtherWindowOnTiePoint("A", id);
             app.ImageWindowB.MarkerDoubleClickedFcn = @(id) app.centerOtherWindowOnTiePoint("B", id);
 
-            app.ImageWindowA.KeyPressedFcn = @(key) app.handleImageKey("A", key);
-            app.ImageWindowB.KeyPressedFcn = @(key) app.handleImageKey("B", key);
+            app.ImageWindowA.KeyPressedFcn = @(key, modifiers) app.handleImageKey("A", key, modifiers);
+            app.ImageWindowB.KeyPressedFcn = @(key, modifiers) app.handleImageKey("B", key, modifiers);
+            app.ImageWindowA.KeyReleasedFcn = @(key, modifiers) app.handleImageKeyRelease("A", key, modifiers);
+            app.ImageWindowB.KeyReleasedFcn = @(key, modifiers) app.handleImageKeyRelease("B", key, modifiers);
 
             app.ImageWindowA.FocusGainedFcn = @() app.setActiveImageRole("A");
             app.ImageWindowB.FocusGainedFcn = @() app.setActiveImageRole("B");
@@ -183,10 +190,16 @@ classdef ANCHOR < handle
             app.persistAndRefresh();
         end
 
-        function handleImageKey(app, imageRole, key)
+        function handleImageKey(app, imageRole, key, modifiers)
             app.setActiveImageRole(imageRole);
+            key = lower(key);
+            modifiers = lower(modifiers);
 
             switch key
+                case "shift"
+                    app.startOverlay(imageRole, "flicker");
+                case "control"
+                    app.startOverlay(imageRole, "transparent");
                 case "space"
                     app.createCenteredTiePoint();
                 case "backspace"
@@ -203,6 +216,14 @@ classdef ANCHOR < handle
                     app.toggleImageFocus(imageRole);
                 case "c"
                     app.getImageWindow(imageRole).toggleCrosshair();
+                case {"add", "equal", "plus"}
+                    if any(modifiers == "control") || app.OverlayMode == "transparent"
+                        app.adjustOverlayAlpha(0.05);
+                    end
+                case {"subtract", "hyphen", "minus"}
+                    if any(modifiers == "control") || app.OverlayMode == "transparent"
+                        app.adjustOverlayAlpha(-0.05);
+                    end
                 case "q"
                     app.TiePointStore.selectPrevious();
                     app.centerWindowsOnActiveTiePoint();
@@ -211,6 +232,18 @@ classdef ANCHOR < handle
                     app.TiePointStore.selectNext();
                     app.centerWindowsOnActiveTiePoint();
                     app.refreshTiePointViews();
+            end
+        end
+
+        function handleImageKeyRelease(app, imageRole, key, ~)
+            app.setActiveImageRole(imageRole);
+            key = lower(key);
+
+            switch key
+                case "shift"
+                    app.endFlickerOverlay();
+                case "control"
+                    app.commitTransparentOverlay();
             end
         end
 
@@ -293,6 +326,77 @@ classdef ANCHOR < handle
             app.getImageWindow(targetRole).bringToFront();
         end
 
+        function startOverlay(app, focusedRole, mode)
+            id = app.TiePointStore.getActiveId();
+            if isnan(id)
+                return
+            end
+
+            otherRole = app.otherImageRole(focusedRole);
+            focusedPoint = app.TiePointStore.getPoint(id, focusedRole);
+            otherPoint = app.TiePointStore.getPoint(id, otherRole);
+            if any(isnan([focusedPoint otherPoint]))
+                return
+            end
+
+            focusedWindow = app.getImageWindow(focusedRole);
+            otherSource = app.getImageSource(otherRole);
+            offset = focusedPoint - otherPoint;
+            shouldFlicker = mode == "flicker";
+
+            app.ImageWindowA.hideOverlay();
+            app.ImageWindowB.hideOverlay();
+            focusedWindow.showTranslatedOverlay( ...
+                otherSource.getDisplayData(), offset, app.OverlayAlpha, shouldFlicker);
+
+            app.OverlayMode = mode;
+            app.OverlayFocusedRole = focusedRole;
+            app.OverlayOtherRole = otherRole;
+            app.OverlayTiePointId = id;
+        end
+
+        function endFlickerOverlay(app)
+            if app.OverlayMode ~= "flicker"
+                return
+            end
+
+            app.getImageWindow(app.OverlayFocusedRole).hideOverlay();
+            app.clearOverlayState();
+        end
+
+        function commitTransparentOverlay(app)
+            if app.OverlayMode ~= "transparent"
+                return
+            end
+
+            focusedWindow = app.getImageWindow(app.OverlayFocusedRole);
+            overlayDelta = focusedWindow.getOverlayOffset();
+            focusedWindow.hideOverlay();
+
+            if ~isnan(app.OverlayTiePointId)
+                oldOtherPoint = app.TiePointStore.getPoint(app.OverlayTiePointId, app.OverlayOtherRole);
+                newOtherPoint = oldOtherPoint - overlayDelta;
+                app.TiePointStore.updatePoint(app.OverlayTiePointId, app.OverlayOtherRole, newOtherPoint);
+                app.TiePointStore.selectTiePoint(app.OverlayTiePointId);
+                app.persistAndRefresh();
+            end
+
+            app.clearOverlayState();
+        end
+
+        function adjustOverlayAlpha(app, delta)
+            app.OverlayAlpha = min(max(app.OverlayAlpha + delta, 0.05), 1.0);
+
+            if app.OverlayMode == "transparent"
+                app.getImageWindow(app.OverlayFocusedRole).adjustOverlayAlpha(delta);
+            end
+        end
+
+        function clearOverlayState(app)
+            app.OverlayMode = "none";
+            app.OverlayTiePointId = NaN;
+        end
+
         function refreshTiePointViews(app)
             tiePoints = app.TiePointStore.toTable();
             activeId = app.TiePointStore.getActiveId();
@@ -312,9 +416,31 @@ classdef ANCHOR < handle
                     "Image role must be ""A"" or ""B"".");
             end
         end
+
+        function source = getImageSource(app, imageRole)
+            if imageRole == "A"
+                source = app.ImageSourceA;
+            elseif imageRole == "B"
+                source = app.ImageSourceB;
+            else
+                error("anchor:ANCHOR:InvalidImageRole", ...
+                    "Image role must be ""A"" or ""B"".");
+            end
+        end
     end
 
     methods (Access = private, Static)
+        function otherRole = otherImageRole(imageRole)
+            if imageRole == "A"
+                otherRole = "B";
+            elseif imageRole == "B"
+                otherRole = "A";
+            else
+                error("anchor:ANCHOR:InvalidImageRole", ...
+                    "Image role must be ""A"" or ""B"".");
+            end
+        end
+
         function source = asImageSource(inputImage, defaultName)
             if isa(inputImage, "anchor.MatrixImageSource")
                 source = inputImage;

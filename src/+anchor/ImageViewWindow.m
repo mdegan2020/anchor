@@ -23,6 +23,15 @@ classdef ImageViewWindow < handle
         PanStartYLim (1, 2) double = [NaN NaN]
         CrosshairVisible (1, 1) logical = false
         CrosshairHandles = gobjects(0)
+        OverlayHandle = gobjects(0)
+        OverlayBaseXData (1, 2) double = [NaN NaN]
+        OverlayBaseYData (1, 2) double = [NaN NaN]
+        OverlayOffset (1, 2) double = [0 0]
+        OverlayAlpha (1, 1) double = 0.5
+        OverlayTimer = []
+        IsOverlayDragging (1, 1) logical = false
+        OverlayDragStartPoint (1, 2) double = [NaN NaN]
+        OverlayDragStartOffset (1, 2) double = [0 0]
     end
 
     properties
@@ -31,6 +40,7 @@ classdef ImageViewWindow < handle
         MarkerMovedFcn = []
         MarkerDoubleClickedFcn = []
         KeyPressedFcn = []
+        KeyReleasedFcn = []
         FocusGainedFcn = []
         CloseRequestedFcn = []
     end
@@ -54,6 +64,7 @@ classdef ImageViewWindow < handle
         end
 
         function delete(window)
+            window.stopOverlayTimer();
             if ~isempty(window.UIFigure) && isvalid(window.UIFigure)
                 window.UIFigure.CloseRequestFcn = [];
                 delete(window.UIFigure);
@@ -111,6 +122,64 @@ classdef ImageViewWindow < handle
             end
         end
 
+        function showTranslatedOverlay(window, imageData, offset, alpha, shouldFlicker)
+            arguments
+                window
+                imageData
+                offset (1, 2) double
+                alpha (1, 1) double = 0.5
+                shouldFlicker (1, 1) logical = false
+            end
+
+            window.hideOverlay();
+
+            imageSize = size(imageData);
+            window.OverlayBaseXData = [1 imageSize(2)] + offset(1);
+            window.OverlayBaseYData = [1 imageSize(1)] + offset(2);
+            window.OverlayOffset = [0 0];
+            window.OverlayAlpha = min(max(alpha, 0), 1);
+
+            hold(window.Axes, "on");
+            window.OverlayHandle = image(window.Axes, ...
+                "XData", window.OverlayBaseXData, ...
+                "YData", window.OverlayBaseYData, ...
+                "CData", imageData, ...
+                "AlphaData", window.OverlayAlpha, ...
+                "HitTest", "off", ...
+                "PickableParts", "none");
+            hold(window.Axes, "off");
+            colormap(window.Axes, gray(256));
+
+            if shouldFlicker
+                window.startOverlayTimer();
+            end
+        end
+
+        function hideOverlay(window)
+            window.stopOverlayTimer();
+            if ~isempty(window.OverlayHandle) && isvalid(window.OverlayHandle)
+                delete(window.OverlayHandle);
+            end
+            window.OverlayHandle = gobjects(0);
+            window.OverlayOffset = [0 0];
+            window.IsOverlayDragging = false;
+        end
+
+        function tf = hasOverlay(window)
+            tf = ~isempty(window.OverlayHandle) && isvalid(window.OverlayHandle);
+        end
+
+        function offset = getOverlayOffset(window)
+            offset = window.OverlayOffset;
+        end
+
+        function adjustOverlayAlpha(window, delta)
+            window.OverlayAlpha = min(max(window.OverlayAlpha + delta, 0.05), 1.0);
+            if window.hasOverlay()
+                window.OverlayHandle.AlphaData = window.OverlayAlpha;
+            end
+        end
+
         function setTiePoints(window, tiePoints, activeId)
             window.clearMarkers();
 
@@ -135,6 +204,7 @@ classdef ImageViewWindow < handle
                 "Position", window.InitialPosition, ...
                 "CloseRequestFcn", @(~, ~) window.handleCloseRequest(), ...
                 "WindowKeyPressFcn", @(~, event) window.handleKeyPress(event), ...
+                "WindowKeyReleaseFcn", @(~, event) window.handleKeyRelease(event), ...
                 "WindowButtonDownFcn", @(~, ~) window.handleWindowButtonDown(), ...
                 "WindowButtonMotionFcn", @(~, ~) window.handleWindowButtonMotion(), ...
                 "WindowButtonUpFcn", @(~, ~) window.handleWindowButtonUp(), ...
@@ -252,6 +322,9 @@ classdef ImageViewWindow < handle
             window.invokeCallback(window.FocusGainedFcn);
 
             if ~isnan(window.DragTiePointId) || string(window.UIFigure.SelectionType) ~= "normal"
+                if window.hasOverlay() && string(window.UIFigure.SelectionType) == "alt"
+                    window.startOverlayDrag();
+                end
                 return
             end
 
@@ -268,6 +341,13 @@ classdef ImageViewWindow < handle
 
         function handleWindowButtonMotion(window)
             if isnan(window.DragTiePointId)
+                if window.IsOverlayDragging
+                    currentPoint = window.getCurrentImagePoint();
+                    delta = currentPoint - window.OverlayDragStartPoint;
+                    window.setOverlayOffset(window.OverlayDragStartOffset + delta);
+                    return
+                end
+
                 if window.IsPanning
                     currentPoint = window.getCurrentImagePoint();
                     delta = currentPoint - window.PanStartPoint;
@@ -284,11 +364,16 @@ classdef ImageViewWindow < handle
         function handleWindowButtonUp(window)
             window.DragTiePointId = NaN;
             window.IsPanning = false;
+            window.IsOverlayDragging = false;
         end
 
         function handleKeyPress(window, event)
             window.invokeCallback(window.FocusGainedFcn);
-            window.invokeCallback(window.KeyPressedFcn, string(event.Key));
+            window.invokeCallback(window.KeyPressedFcn, string(event.Key), string(event.Modifier));
+        end
+
+        function handleKeyRelease(window, event)
+            window.invokeCallback(window.KeyReleasedFcn, string(event.Key), string(event.Modifier));
         end
 
         function handleCloseRequest(window)
@@ -397,6 +482,49 @@ classdef ImageViewWindow < handle
             validHandles(1).YData = [center(2) center(2)];
             validHandles(2).XData = [center(1) center(1)];
             validHandles(2).YData = window.Axes.YLim;
+        end
+
+        function startOverlayDrag(window)
+            window.IsOverlayDragging = true;
+            window.OverlayDragStartPoint = window.getCurrentImagePoint();
+            window.OverlayDragStartOffset = window.OverlayOffset;
+        end
+
+        function setOverlayOffset(window, offset)
+            window.OverlayOffset = offset;
+
+            if window.hasOverlay()
+                window.OverlayHandle.XData = window.OverlayBaseXData + offset(1);
+                window.OverlayHandle.YData = window.OverlayBaseYData + offset(2);
+            end
+        end
+
+        function startOverlayTimer(window)
+            window.stopOverlayTimer();
+
+            window.OverlayTimer = timer( ...
+                "ExecutionMode", "fixedSpacing", ...
+                "Period", 0.35, ...
+                "TimerFcn", @(~, ~) window.toggleOverlayVisibility());
+            start(window.OverlayTimer);
+        end
+
+        function stopOverlayTimer(window)
+            if ~isempty(window.OverlayTimer) && isvalid(window.OverlayTimer)
+                stop(window.OverlayTimer);
+                delete(window.OverlayTimer);
+            end
+            window.OverlayTimer = [];
+        end
+
+        function toggleOverlayVisibility(window)
+            if window.hasOverlay()
+                if window.OverlayHandle.Visible == "on"
+                    window.OverlayHandle.Visible = "off";
+                else
+                    window.OverlayHandle.Visible = "on";
+                end
+            end
         end
     end
 

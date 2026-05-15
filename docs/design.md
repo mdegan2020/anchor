@@ -627,4 +627,4 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 
 ## Proposed Next Step
 
-Proceed to Milestone 6: implement `Shift` flicker overlay and `Left Ctrl` transparent overlay modes, including temporary translation state and commit-on-release behavior for the non-focused tiepoint coordinate.
+Proceed to Milestone 7: implement `LocalRegistrationEstimator` and the `G` key view-alignment workflow using homography initialization plus phase correlation.
