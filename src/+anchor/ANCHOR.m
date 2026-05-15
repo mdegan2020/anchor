@@ -136,7 +136,7 @@ classdef ANCHOR < handle
                 app.updateTiePointField(id, fieldName, value);
             app.TableWindow.MatchAFromBRequestedFcn = @() app.matchImageAViewFromB();
             app.TableWindow.MatchBFromARequestedFcn = @() app.matchImageBViewFromA();
-            app.TableWindow.CloseRequestedFcn = @() app.closeApplication();
+            app.TableWindow.CloseRequestedFcn = @() app.closeApplication("table");
 
             app.ImageWindowA.CenteredTiePointRequestedFcn = @() app.createCenteredTiePoint();
             app.ImageWindowB.CenteredTiePointRequestedFcn = @() app.createCenteredTiePoint();
@@ -158,8 +158,8 @@ classdef ANCHOR < handle
             app.ImageWindowA.FocusGainedFcn = @() app.setActiveImageRole("A");
             app.ImageWindowB.FocusGainedFcn = @() app.setActiveImageRole("B");
 
-            app.ImageWindowA.CloseRequestedFcn = @() app.closeApplication();
-            app.ImageWindowB.CloseRequestedFcn = @() app.closeApplication();
+            app.ImageWindowA.CloseRequestedFcn = @() app.closeApplication("image");
+            app.ImageWindowB.CloseRequestedFcn = @() app.closeApplication("image");
         end
 
         function id = createCenteredTiePoint(app)
@@ -280,6 +280,7 @@ classdef ANCHOR < handle
 
         function persistAndRefresh(app)
             app.updateHomography();
+            app.markCsvDirty();
             app.writeCsvIfReady();
             app.refreshTiePointViews();
         end
@@ -288,23 +289,74 @@ classdef ANCHOR < handle
             app.HomographyModel.update(app.TiePointStore.toTable());
         end
 
+        function markCsvDirty(app)
+            if ~isempty(app.CsvWriter)
+                app.CsvWriter.markDirty();
+            end
+        end
+
         function writeCsvIfReady(app)
             if isempty(app.CsvWriter) || isempty(app.TiePointStore) || ...
                     isempty(app.ImageSourceA) || isempty(app.ImageSourceB)
                 return
             end
 
-            app.CsvWriter.write(app.TiePointStore.toTable(), app.ImageSourceA, app.ImageSourceB);
+            try
+                app.CsvWriter.write(app.TiePointStore.toTable(), app.ImageSourceA, app.ImageSourceB);
+            catch err
+                warning("anchor:ANCHOR:CsvWriteFailed", ...
+                    "Unable to write tiepoint CSV '%s': %s", ...
+                    char(app.CsvWriter.OutputPath), err.message);
+            end
         end
 
-        function closeApplication(app)
+        function closeApplication(app, closeSource)
+            if nargin < 2
+                closeSource = "controller";
+            end
+
             if app.IsClosing
                 return
             end
 
+            writeOnClose = true;
+            if closeSource == "table"
+                [shouldClose, writeOnClose] = app.confirmTableClose();
+                if ~shouldClose
+                    return
+                end
+            end
+
             app.IsClosing = true;
-            app.writeCsvIfReady();
+            if writeOnClose
+                app.writeCsvIfReady();
+            end
             delete(app);
+        end
+
+        function [shouldClose, writeOnClose] = confirmTableClose(app)
+            shouldClose = true;
+            writeOnClose = true;
+
+            if isempty(app.CsvWriter) || ~app.CsvWriter.HasUnsavedChanges
+                return
+            end
+
+            choice = app.TableWindow.confirmUnsavedCsvClose(app.CsvWriter.OutputPath);
+            switch choice
+                case "Save and Close"
+                    app.writeCsvIfReady();
+                    writeOnClose = false;
+                    if app.CsvWriter.HasUnsavedChanges
+                        app.TableWindow.alertCsvSaveFailed(app.CsvWriter.LastErrorMessage);
+                        shouldClose = false;
+                    end
+                case "Close Without Saving"
+                    writeOnClose = false;
+                otherwise
+                    shouldClose = false;
+                    writeOnClose = false;
+            end
         end
 
         function matchView(app, sourceRole, targetRole)

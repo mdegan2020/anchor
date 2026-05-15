@@ -3,6 +3,8 @@ classdef CsvTiePointWriter < handle
 
     properties (SetAccess = private)
         OutputPath (1, 1) string
+        HasUnsavedChanges (1, 1) logical = false
+        LastErrorMessage (1, 1) string = ""
     end
 
     methods
@@ -12,6 +14,10 @@ classdef CsvTiePointWriter < handle
             end
 
             writer.OutputPath = string(outputPath);
+        end
+
+        function markDirty(writer)
+            writer.HasUnsavedChanges = true;
         end
 
         function write(writer, tiePoints, sourceA, sourceB)
@@ -24,8 +30,16 @@ classdef CsvTiePointWriter < handle
                 'VariableNames', {'fname1', 'ix1', 'iy1', 'fname2', 'ix2', 'iy2', 'enabled'});
 
             tempPath = writer.OutputPath + ".tmp";
-            writetable(outputTable, tempPath, 'FileType', 'text');
-            movefile(tempPath, writer.OutputPath, 'f');
+            try
+                writetable(outputTable, tempPath, 'FileType', 'text');
+                movefile(tempPath, writer.OutputPath, 'f');
+                writer.HasUnsavedChanges = false;
+                writer.LastErrorMessage = "";
+            catch err
+                writer.HasUnsavedChanges = true;
+                writer.LastErrorMessage = string(err.message);
+                rethrow(err);
+            end
         end
     end
 end

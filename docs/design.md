@@ -467,10 +467,14 @@ Pressing `G` should estimate a local translation between the focused image and t
 Process:
 
 1. Query the focused image window's current view extent and scale.
-2. Use the current homography to estimate the corresponding region in the non-focused image.
-3. Render comparable patches from both image sources in memory.
-4. Use phase correlation on the patches to estimate a local translation.
-5. Update the non-focused image window to the same scale and a correlation-adjusted center.
+2. Use that exact displayed focused-window extent as the patch definition.
+3. Use the current homography to estimate the corresponding region in the non-focused image.
+4. Render comparable patches from both image sources in memory with the same array size as the focused view.
+5. Use phase correlation on the two rendered patches to estimate a local translation.
+6. Convert the correlation shift from rendered-patch pixels back through the current view resolution/scale.
+7. Update the non-focused image window to the same scale and a correlation-adjusted center.
+
+The focused view fully determines patch size, search area, and resolution. For example, if the focused window is displaying a 512-by-640 patch at 2:1 image-to-screen resolution, the correlation algorithm should receive two 512-by-640 arrays. The returned patch-pixel shift is then converted back to image coordinates before the non-focused view center is updated. There is no independent search-window setting in the first implementation.
 
 This action must not update the highlighted tiepoint or create a new point. If the user likes the aligned views, pressing `Space` creates a new complete tiepoint at the two current view centers.
 
@@ -520,7 +524,8 @@ Implementation can start with callback properties on each window class, for exam
 
 The application should handle window closure explicitly:
 
-- Closing the table window should close the full app after writing the current CSV.
+- Closing the table window should close the full app after checking whether the tiepoint CSV has changes since the last successful save.
+- If CSV changes are pending, the table window should ask whether to save and close, close without saving, or cancel.
 - Closing either image window should close the full app after writing the current CSV.
 - Closing the controller should write the current CSV and delete all owned `uifigure` objects.
 - Each window class should implement `delete` defensively so repeated cleanup is harmless.
@@ -619,11 +624,14 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 - Add an image source that avoids full-resolution redraws during navigation.
 - Introduce decimated overviews or tiled reads behind the `ImageSource` interface.
 
-## Open Questions
+## Resolved Questions
 
-- What patch size, search window, and preprocessing should phase correlation use first?
-- How should future georeferenced/map coordinates be represented in the CSV export?
-- Should closing the table window require confirmation, or is the continuous CSV enough protection?
+- Phase correlation should use exactly the current focused-window view extent, displayed patch size, and view resolution at the moment `G` is pressed.
+- Closing the table window should require confirmation only when the CSV state is dirty since the last successful save.
+
+## Deferred Questions
+
+- Future georeferenced/map coordinate representation in CSV export is deferred until image-to-map functions are introduced.
 
 ## Proposed Next Step
 

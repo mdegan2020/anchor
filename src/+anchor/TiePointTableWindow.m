@@ -72,6 +72,35 @@ classdef TiePointTableWindow < handle
                 end
             end
         end
+
+        function choice = confirmUnsavedCsvClose(window, outputPath)
+            if ~window.isOpen()
+                choice = "Save and Close";
+                return
+            end
+
+            message = sprintf([ ...
+                "The tiepoint CSV has changes that have not been saved to:\n\n%s\n\n" ...
+                "Save before closing ANCHOR?"], char(outputPath));
+
+            choice = string(uiconfirm(window.UIFigure, message, ...
+                "Unsaved CSV Changes", ...
+                "Options", ["Save and Close", "Close Without Saving", "Cancel"], ...
+                "DefaultOption", "Save and Close", ...
+                "CancelOption", "Cancel"));
+        end
+
+        function alertCsvSaveFailed(window, message)
+            if ~window.isOpen()
+                return
+            end
+
+            if strlength(message) == 0
+                message = "The tiepoint CSV could not be written.";
+            end
+
+            uialert(window.UIFigure, message, "CSV Save Failed");
+        end
     end
 
     methods (Access = private)
