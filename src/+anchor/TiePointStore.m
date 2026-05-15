@@ -149,6 +149,28 @@ classdef TiePointStore < handle
         function data = toTable(store)
             data = store.Points;
         end
+
+        function replaceFromTable(store, points, activeId)
+            arguments
+                store
+                points table
+                activeId double = NaN
+            end
+
+            store.Points = anchor.TiePointStore.normalizeTable(points);
+            if isempty(store.Points)
+                store.NextId = 1;
+                store.ActiveId = NaN;
+                return
+            end
+
+            store.NextId = max(store.Points.Id, [], "all") + 1;
+            if any(store.Points.Id == activeId)
+                store.ActiveId = activeId;
+            else
+                store.ActiveId = store.Points.Id(1);
+            end
+        end
     end
 
     methods (Access = private)
@@ -180,6 +202,30 @@ classdef TiePointStore < handle
                 'Size', [0 7], ...
                 'VariableTypes', {'double', 'double', 'double', 'double', 'double', 'logical', 'string'}, ...
                 'VariableNames', {'Id', 'A_X', 'A_Y', 'B_X', 'B_Y', 'Enabled', 'Notes'});
+        end
+
+        function data = normalizeTable(data)
+            requiredNames = ["Id", "A_X", "A_Y", "B_X", "B_Y", "Enabled", "Notes"];
+            if isempty(data)
+                data = anchor.TiePointStore.emptyTable();
+                return
+            end
+
+            missingNames = setdiff(requiredNames, string(data.Properties.VariableNames));
+            if ~isempty(missingNames)
+                error("anchor:TiePointStore:InvalidTable", ...
+                    "Tiepoint table is missing required variables: %s.", ...
+                    strjoin(missingNames, ", "));
+            end
+
+            data = data(:, requiredNames);
+            data.Id = double(data.Id);
+            data.A_X = double(data.A_X);
+            data.A_Y = double(data.A_Y);
+            data.B_X = double(data.B_X);
+            data.B_Y = double(data.B_Y);
+            data.Enabled = logical(data.Enabled);
+            data.Notes = string(data.Notes);
         end
     end
 end

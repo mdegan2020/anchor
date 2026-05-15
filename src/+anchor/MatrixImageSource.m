@@ -27,6 +27,13 @@ classdef MatrixImageSource < handle
             displayData = source.Data;
         end
 
+        function state = toSessionStruct(source)
+            state = struct( ...
+                "Type", "MatrixImageSource", ...
+                "Name", source.Name, ...
+                "Data", source.Data);
+        end
+
         function outputSize = getViewportOutputSize(~, viewportState)
             outputSize = [ ...
                 max(1, round(viewportState.getHeight())), ...
@@ -84,6 +91,17 @@ classdef MatrixImageSource < handle
                 limits(1) + sampleSpacing / 2, ...
                 limits(2) - sampleSpacing / 2, ...
                 count);
+        end
+    end
+
+    methods (Static)
+        function source = fromSessionStruct(state)
+            if ~isfield(state, "Type") || string(state.Type) ~= "MatrixImageSource"
+                error("anchor:MatrixImageSource:InvalidSessionState", ...
+                    "Session image source state is not a MatrixImageSource.");
+            end
+
+            source = anchor.MatrixImageSource(state.Data, string(state.Name));
         end
     end
 end

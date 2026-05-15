@@ -20,6 +20,21 @@ classdef CsvTiePointWriter < handle
             writer.HasUnsavedChanges = true;
         end
 
+        function setOutputPath(writer, outputPath)
+            arguments
+                writer
+                outputPath (1, 1) string
+            end
+
+            if strlength(outputPath) == 0
+                error("anchor:CsvTiePointWriter:InvalidOutputPath", ...
+                    "CSV output path must be nonempty.");
+            end
+
+            writer.OutputPath = outputPath;
+            writer.HasUnsavedChanges = true;
+        end
+
         function write(writer, tiePoints, sourceA, sourceB)
             outputTable = table( ...
                 repmat(sourceA.Name, height(tiePoints), 1), ...

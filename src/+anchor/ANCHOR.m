@@ -8,6 +8,7 @@ classdef ANCHOR < handle
         HomographyModel
         LocalRegistrationEstimator
         CsvWriter
+        SessionPath (1, 1) string = ""
         ImageWindowA
         ImageWindowB
         TableWindow
@@ -132,6 +133,27 @@ classdef ANCHOR < handle
             result = app.alignOtherViewByLocalCorrelationInternal(string(focusedRole));
         end
 
+        function saveSession(app, sessionPath)
+            arguments
+                app
+                sessionPath (1, 1) string
+            end
+
+            anchor.SessionSerializer.saveSession(sessionPath, app.createSessionStruct());
+            app.SessionPath = sessionPath;
+        end
+
+        function loadSession(app, sessionPath)
+            arguments
+                app
+                sessionPath (1, 1) string
+            end
+
+            session = anchor.SessionSerializer.loadSession(sessionPath);
+            app.applySessionStruct(session);
+            app.SessionPath = sessionPath;
+        end
+
         function imageRole = getActiveImageRole(app)
             imageRole = app.ActiveImageRole;
         end
@@ -146,6 +168,8 @@ classdef ANCHOR < handle
                 app.updateTiePointField(id, fieldName, value);
             app.TableWindow.MatchAFromBRequestedFcn = @() app.matchImageAViewFromB();
             app.TableWindow.MatchBFromARequestedFcn = @() app.matchImageBViewFromA();
+            app.TableWindow.SaveSessionRequestedFcn = @() app.saveSessionFromDialog();
+            app.TableWindow.LoadSessionRequestedFcn = @() app.loadSessionFromDialog();
             app.TableWindow.CloseRequestedFcn = @() app.closeApplication("table");
 
             app.ImageWindowA.CenteredTiePointRequestedFcn = @() app.createCenteredTiePoint();
@@ -379,6 +403,77 @@ classdef ANCHOR < handle
             targetWindow.setViewportState(targetState);
         end
 
+        function saveSessionFromDialog(app)
+            defaultPath = app.defaultSessionDialogPath();
+            [fileName, folderName] = uiputfile("*.mat", ...
+                "Save ANCHOR Session", defaultPath);
+            if isequal(fileName, 0) || isequal(folderName, 0)
+                return
+            end
+
+            app.saveSession(fullfile(folderName, fileName));
+        end
+
+        function loadSessionFromDialog(app)
+            [fileName, folderName] = uigetfile("*.mat", "Load ANCHOR Session");
+            if isequal(fileName, 0) || isequal(folderName, 0)
+                return
+            end
+
+            app.loadSession(fullfile(folderName, fileName));
+        end
+
+        function sessionPath = defaultSessionDialogPath(app)
+            if strlength(app.SessionPath) > 0
+                sessionPath = app.SessionPath;
+            else
+                sessionPath = fullfile(pwd, "anchor_session.mat");
+            end
+        end
+
+        function session = createSessionStruct(app)
+            session = struct( ...
+                "Version", "1.0", ...
+                "CreatedAt", string(datetime("now")), ...
+                "ImageA", app.ImageSourceA.toSessionStruct(), ...
+                "ImageB", app.ImageSourceB.toSessionStruct(), ...
+                "TiePoints", app.TiePointStore.toTable(), ...
+                "ActiveTiePointId", app.TiePointStore.getActiveId(), ...
+                "Homography", app.HomographyModel.toSessionStruct(), ...
+                "CsvOutputPath", app.CsvWriter.OutputPath, ...
+                "ViewportA", app.viewportToStruct(app.ImageWindowA.getViewportState()), ...
+                "ViewportB", app.viewportToStruct(app.ImageWindowB.getViewportState()), ...
+                "ActiveImageRole", app.ActiveImageRole);
+        end
+
+        function applySessionStruct(app, session)
+            app.ImageSourceA = anchor.MatrixImageSource.fromSessionStruct(session.ImageA);
+            app.ImageSourceB = anchor.MatrixImageSource.fromSessionStruct(session.ImageB);
+            app.TiePointStore.replaceFromTable(session.TiePoints, session.ActiveTiePointId);
+            app.HomographyModel.restoreFromSessionStruct(session.Homography);
+            app.CsvWriter.setOutputPath(session.CsvOutputPath);
+            app.ActiveImageRole = session.ActiveImageRole;
+            app.recreateImageWindows();
+            app.ImageWindowA.setViewportState(app.structToViewport(session.ViewportA));
+            app.ImageWindowB.setViewportState(app.structToViewport(session.ViewportB));
+            app.refreshTiePointViews();
+            app.writeCsvIfReady();
+        end
+
+        function recreateImageWindows(app)
+            positionA = app.ImageWindowA.getWindowPosition();
+            positionB = app.ImageWindowB.getWindowPosition();
+
+            anchor.ANCHOR.deleteIfValid(app.ImageWindowA);
+            anchor.ANCHOR.deleteIfValid(app.ImageWindowB);
+
+            app.ImageWindowA = anchor.ImageViewWindow( ...
+                app.ImageSourceA, "A", "ANCHOR Image A", positionA);
+            app.ImageWindowB = anchor.ImageViewWindow( ...
+                app.ImageSourceB, "B", "ANCHOR Image B", positionB);
+            app.wireCallbacks();
+        end
+
         function result = alignOtherViewByLocalCorrelationInternal(app, focusedRole)
             otherRole = app.otherImageRole(focusedRole);
             focusedWindow = app.getImageWindow(focusedRole);
@@ -535,6 +630,14 @@ classdef ANCHOR < handle
 
             error("anchor:ANCHOR:UnsupportedImageInput", ...
                 "Image inputs must be numeric matrices or anchor.MatrixImageSource instances.");
+        end
+
+        function state = viewportToStruct(viewport)
+            state = struct("XLim", viewport.XLim, "YLim", viewport.YLim);
+        end
+
+        function viewport = structToViewport(state)
+            viewport = anchor.ViewportState(state.XLim, state.YLim);
         end
 
         function [imageA, imageB] = createDemoImages()

@@ -621,6 +621,8 @@ Status: implemented for in-memory matrix image sources using focused-view viewpo
 - Save and load sessions.
 - Preserve image references, tiepoints, homography state, CSV target, and useful view state.
 
+Status: implemented for in-memory matrix image sources with MAT-file session save/load from the table window.
+
 ### Milestone 9: Large Image Backend
 
 - Add an image source that avoids full-resolution redraws during navigation.
@@ -637,4 +639,4 @@ Status: implemented for in-memory matrix image sources using focused-view viewpo
 
 ## Proposed Next Step
 
-Proceed to Milestone 8: add session persistence for image references, tiepoints, homography state, CSV target, and useful view state.
+Proceed to Milestone 9: add a large-image source abstraction that avoids full-resolution redraws during navigation.

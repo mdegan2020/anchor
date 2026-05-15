@@ -83,6 +83,14 @@ classdef ImageViewWindow < handle
             end
         end
 
+        function position = getWindowPosition(window)
+            if window.isOpen()
+                position = window.UIFigure.Position;
+            else
+                position = window.InitialPosition;
+            end
+        end
+
         function role = getImageRole(window)
             role = window.ImageRole;
         end

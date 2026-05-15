@@ -67,6 +67,19 @@ classdef HomographyModel < handle
                 [min(mappedCorners(:, 1)), max(mappedCorners(:, 1))], ...
                 [min(mappedCorners(:, 2)), max(mappedCorners(:, 2))]);
         end
+
+        function state = toSessionStruct(model)
+            state = struct( ...
+                "AToB", model.AToB, ...
+                "BToA", model.BToA, ...
+                "TransformType", model.TransformType);
+        end
+
+        function restoreFromSessionStruct(model, state)
+            model.AToB = state.AToB ./ state.AToB(3, 3);
+            model.BToA = state.BToA ./ state.BToA(3, 3);
+            model.TransformType = string(state.TransformType);
+        end
     end
 
     methods (Access = private)

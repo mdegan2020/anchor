@@ -12,6 +12,8 @@ classdef TiePointTableWindow < handle
         DeleteButton
         MatchAButton
         MatchBButton
+        SaveSessionButton
+        LoadSessionButton
         Table
     end
 
@@ -22,6 +24,8 @@ classdef TiePointTableWindow < handle
         TiePointEditedFcn = []
         MatchAFromBRequestedFcn = []
         MatchBFromARequestedFcn = []
+        SaveSessionRequestedFcn = []
+        LoadSessionRequestedFcn = []
         CloseRequestedFcn = []
     end
 
@@ -117,10 +121,10 @@ classdef TiePointTableWindow < handle
             window.GridLayout.Padding = [10 10 10 10];
             window.GridLayout.RowSpacing = 8;
 
-            window.ToolbarGrid = uigridlayout(window.GridLayout, [1 5]);
+            window.ToolbarGrid = uigridlayout(window.GridLayout, [1 7]);
             window.ToolbarGrid.Layout.Row = 1;
             window.ToolbarGrid.Layout.Column = 1;
-            window.ToolbarGrid.ColumnWidth = {"fit", "fit", "fit", "fit", "1x"};
+            window.ToolbarGrid.ColumnWidth = {"fit", "fit", "fit", "fit", "fit", "fit", "1x"};
             window.ToolbarGrid.RowHeight = {"fit"};
             window.ToolbarGrid.Padding = [0 0 0 0];
             window.ToolbarGrid.ColumnSpacing = 8;
@@ -149,6 +153,18 @@ classdef TiePointTableWindow < handle
                 "ButtonPushedFcn", @(~, ~) window.requestMatchBFromA());
             window.MatchBButton.Layout.Row = 1;
             window.MatchBButton.Layout.Column = 4;
+
+            window.SaveSessionButton = uibutton(window.ToolbarGrid, ...
+                "Text", "Save Session", ...
+                "ButtonPushedFcn", @(~, ~) window.requestSaveSession());
+            window.SaveSessionButton.Layout.Row = 1;
+            window.SaveSessionButton.Layout.Column = 5;
+
+            window.LoadSessionButton = uibutton(window.ToolbarGrid, ...
+                "Text", "Load Session", ...
+                "ButtonPushedFcn", @(~, ~) window.requestLoadSession());
+            window.LoadSessionButton.Layout.Row = 1;
+            window.LoadSessionButton.Layout.Column = 6;
 
             window.Table = uitable(window.GridLayout);
             window.Table.Layout.Row = 2;
@@ -223,6 +239,14 @@ classdef TiePointTableWindow < handle
 
         function requestMatchBFromA(window)
             window.invokeCallback(window.MatchBFromARequestedFcn);
+        end
+
+        function requestSaveSession(window)
+            window.invokeCallback(window.SaveSessionRequestedFcn);
+        end
+
+        function requestLoadSession(window)
+            window.invokeCallback(window.LoadSessionRequestedFcn);
         end
     end
 
