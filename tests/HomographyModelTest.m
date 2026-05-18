@@ -45,5 +45,26 @@ classdef HomographyModelTest < matlab.unittest.TestCase
 
             testCase.verifyEqual(residuals, [0.5; 0.5], AbsTol=1e-12);
         end
+
+        function updateUsesAffineForFourOrMoreTiepoints(testCase)
+            pointsA = [0 0; 10 0; 10 10; 0 10; 5 6];
+            pointsB = [3 4; 23 4; 23 24; 3 24; 13 16];
+            tiePoints = table( ...
+                (1:5).', ...
+                pointsA(:, 1), ...
+                pointsA(:, 2), ...
+                pointsB(:, 1), ...
+                pointsB(:, 2), ...
+                true(5, 1), ...
+                strings(5, 1), ...
+                VariableNames=["Id", "A_X", "A_Y", "B_X", "B_Y", "Enabled", "Notes"]);
+            model = anchor.HomographyModel();
+
+            model.update(tiePoints);
+            mappedPoint = model.mapPoints([2 3], "A", "B");
+
+            testCase.verifyEqual(model.TransformType, "affine");
+            testCase.verifyEqual(mappedPoint, [7 10], AbsTol=1e-10);
+        end
     end
 end

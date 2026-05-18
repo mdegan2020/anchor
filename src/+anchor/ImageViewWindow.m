@@ -154,10 +154,10 @@ classdef ImageViewWindow < handle
             end
         end
 
-        function showTranslatedOverlay(window, imageData, offset, alpha, shouldFlicker)
+        function showTranslatedOverlay(window, imageSource, offset, alpha, shouldFlicker)
             arguments
                 window
-                imageData
+                imageSource anchor.MatrixImageSource
                 offset (1, 2) double
                 alpha (1, 1) double = 0.5
                 shouldFlicker (1, 1) logical = false
@@ -165,9 +165,13 @@ classdef ImageViewWindow < handle
 
             window.hideOverlay();
 
-            imageSize = size(imageData);
-            window.OverlayBaseXData = [1 imageSize(2)] + offset(1);
-            window.OverlayBaseYData = [1 imageSize(1)] + offset(2);
+            viewport = window.getViewportState();
+            sourceViewport = viewport.translate(-offset);
+            outputSize = window.getOverlayOutputSize(viewport);
+            imageData = imageSource.renderViewport(sourceViewport, outputSize);
+
+            window.OverlayBaseXData = viewport.XLim;
+            window.OverlayBaseYData = viewport.YLim;
             window.OverlayOffset = [0 0];
             window.OverlayAlpha = min(max(alpha, 0), 1);
 
@@ -567,6 +571,15 @@ classdef ImageViewWindow < handle
                 window.OverlayHandle.XData = window.OverlayBaseXData + offset(1);
                 window.OverlayHandle.YData = window.OverlayBaseYData + offset(2);
             end
+        end
+
+        function outputSize = getOverlayOutputSize(window, viewport)
+            axesPosition = window.Axes.Position;
+            displaySize = max(2, round([axesPosition(4), axesPosition(3)]));
+            viewportSize = [ ...
+                max(2, round(viewport.getHeight())), ...
+                max(2, round(viewport.getWidth()))];
+            outputSize = min(viewportSize, displaySize);
         end
 
         function startOverlayTimer(window)

@@ -55,33 +55,12 @@ classdef LocalRegistrationEstimator
                 return
             end
 
-            crossPower = fft2(referencePatch) .* conj(fft2(movingPatch));
-            crossPowerMagnitude = abs(crossPower);
-            validBins = crossPowerMagnitude > eps;
-
-            if ~any(validBins, "all")
-                patchShift = [0 0];
-                peakValue = 0;
-                return
-            end
-
-            crossPower(validBins) = crossPower(validBins) ./ crossPowerMagnitude(validBins);
-            crossPower(~validBins) = 0;
-
-            correlationSurface = real(ifft2(crossPower));
+            correlationSurface = normxcorr2(movingPatch, referencePatch);
             [peakValue, peakIndex] = max(correlationSurface, [], "all");
             [peakRow, peakCol] = ind2sub(size(correlationSurface), peakIndex);
 
-            nRows = size(correlationSurface, 1);
-            nCols = size(correlationSurface, 2);
-            xShift = anchor.LocalRegistrationEstimator.signedPeakOffset( ...
-                peakCol, nCols) + ...
-                anchor.LocalRegistrationEstimator.subpixelPeakOffset( ...
-                correlationSurface(peakRow, :), peakCol);
-            yShift = anchor.LocalRegistrationEstimator.signedPeakOffset( ...
-                peakRow, nRows) + ...
-                anchor.LocalRegistrationEstimator.subpixelPeakOffset( ...
-                correlationSurface(:, peakCol).', peakRow);
+            xShift = peakCol - size(movingPatch, 2);
+            yShift = peakRow - size(movingPatch, 1);
 
             patchShift = [xShift, yShift];
         end
@@ -100,32 +79,6 @@ classdef LocalRegistrationEstimator
             fillValue = mean(patch(finiteMask), "all");
             patch(~finiteMask) = fillValue;
             patch = patch - mean(patch, "all");
-        end
-
-        function offset = signedPeakOffset(peakSubscript, dimensionLength)
-            offset = peakSubscript - 1;
-            if offset > dimensionLength / 2
-                offset = offset - dimensionLength;
-            end
-        end
-
-        function offset = subpixelPeakOffset(values, peakIndex)
-            nValues = numel(values);
-            previousIndex = mod(peakIndex - 2, nValues) + 1;
-            nextIndex = mod(peakIndex, nValues) + 1;
-
-            leftValue = values(previousIndex);
-            centerValue = values(peakIndex);
-            rightValue = values(nextIndex);
-            denominator = leftValue - 2 * centerValue + rightValue;
-
-            if abs(denominator) < eps
-                offset = 0;
-                return
-            end
-
-            offset = 0.5 * (leftValue - rightValue) / denominator;
-            offset = min(max(offset, -0.5), 0.5);
         end
 
         function result = createResult(targetState, patchShift, imageShift, ...

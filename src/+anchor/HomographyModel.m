@@ -29,7 +29,7 @@ classdef HomographyModel < handle
                 return
             end
 
-            if count == 3
+            if count >= 3
                 h = anchor.HomographyModel.estimateAffine(pointsA, pointsB);
                 model.setTransform(h, "affine");
                 return

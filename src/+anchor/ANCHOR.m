@@ -603,7 +603,7 @@ classdef ANCHOR < handle
             app.ImageWindowA.hideOverlay();
             app.ImageWindowB.hideOverlay();
             focusedWindow.showTranslatedOverlay( ...
-                otherSource.getDisplayData(), offset, app.OverlayAlpha, shouldFlicker);
+                otherSource, offset, app.OverlayAlpha, shouldFlicker);
 
             app.OverlayMode = mode;
             app.OverlayFocusedRole = focusedRole;

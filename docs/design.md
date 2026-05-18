@@ -279,10 +279,11 @@ The transform fallback rules should be deterministic:
 - 0 tiepoints: identity transform.
 - 1 tiepoint: constant shift from the image A point to the image B point.
 - 2 tiepoints: average shift from the two point-pair deltas.
-- 3 tiepoints: estimate an affine transform.
-- 4 or more tiepoints: attempt to compute the full projective homography.
+- 3 or more tiepoints: estimate an affine transform.
 
-Disabled tiepoints remain visible and are still written to CSV, but they are excluded from homography estimation. If full homography estimation fails because the enabled points are degenerate, ANCHOR should retain the current valid estimate or fall back to average shift.
+The projective homography estimator may remain available in code for future use, but the active transform-selection policy should stop at affine because the full projective model is currently too flexible for the intended workflow.
+
+Disabled tiepoints remain visible and are still written to CSV, but they are excluded from transform estimation. If affine estimation fails because the enabled points are degenerate, ANCHOR should retain the current valid estimate or fall back to average shift.
 
 ### `LocalRegistrationEstimator`
 
@@ -293,7 +294,7 @@ Responsibilities:
 - Take the focused image window's current `ViewportState`.
 - Use the current homography to estimate the corresponding non-focused image region.
 - Request comparable image patches from each `ImageSource`.
-- Estimate a local translation by phase correlation.
+- Estimate a local translation with `normxcorr2`.
 - Return a proposed non-focused viewport with the same scale and a correlation-adjusted center.
 
 This helper must not update tiepoint coordinates. It is a navigation aid only; the user commits a new tiepoint afterward by pressing `Space` if the aligned view looks good.
@@ -472,7 +473,7 @@ This mode needs a temporary overlay transform separate from the committed tiepoi
 
 ## Local Correlation Alignment
 
-Pressing `G` should estimate a local translation between the focused image and the non-focused image using phase correlation.
+Pressing `G` should estimate a local translation between the focused image and the non-focused image using normalized cross-correlation.
 
 Process:
 
@@ -480,7 +481,7 @@ Process:
 2. Use that exact displayed focused-window extent as the patch definition.
 3. Use the current homography to estimate the corresponding region in the non-focused image.
 4. Render comparable patches from both image sources in memory with the same array size as the focused view.
-5. Use phase correlation on the two rendered patches to estimate a local translation.
+5. Use `normxcorr2` on the two rendered patches to estimate a local translation.
 6. Convert the correlation shift from rendered-patch pixels back through the current view resolution/scale.
 7. Update the non-focused image window to the same scale and a correlation-adjusted center.
 
@@ -629,7 +630,7 @@ UI behavior can be smoke-tested from MATLAB by constructing the app with small s
 - Implement `G` key view alignment using homography initialization plus local correlation.
 - Update only the non-focused viewport; do not update tiepoints.
 
-Status: implemented for in-memory matrix image sources using focused-view viewport rendering and FFT phase correlation.
+Status: implemented for in-memory matrix image sources using focused-view viewport rendering and `normxcorr2`.
 
 ### Milestone 8: Session Persistence
 
@@ -642,10 +643,12 @@ Status: implemented for in-memory matrix image sources with MAT-file session sav
 
 - Add an image source that avoids full-resolution redraws during navigation.
 - Introduce decimated overviews or tiled reads behind the `ImageSource` interface.
+- Keep overlay rendering viewport-local so flicker and transparent comparison modes do not create full-image overlay graphics for very large inputs.
+- Preserve the native image matrix type for display when possible; cast only local sampled regions needed for interpolation or registration.
 
 ## Resolved Questions
 
-- Phase correlation should use exactly the current focused-window view extent, displayed patch size, and view resolution at the moment `G` is pressed.
+- Local correlation should use exactly the current focused-window view extent, displayed patch size, and view resolution at the moment `G` is pressed.
 - Closing the table window should require confirmation only when the CSV state is dirty since the last successful save.
 
 ## Deferred Questions

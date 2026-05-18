@@ -1,5 +1,5 @@
 classdef LocalRegistrationEstimatorTest < matlab.unittest.TestCase
-    %LocalRegistrationEstimatorTest Unit tests for local phase correlation.
+    %LocalRegistrationEstimatorTest Unit tests for local normalized correlation.
 
     methods (TestClassSetup)
         function addSourceToPath(testCase)
@@ -17,7 +17,7 @@ classdef LocalRegistrationEstimatorTest < matlab.unittest.TestCase
                 anchor.LocalRegistrationEstimator.estimatePatchShift( ...
                 referencePatch, movingPatch);
 
-            testCase.verifyEqual(patchShift, [6 -4], AbsTol=0.25);
+            testCase.verifyEqual(patchShift, [7 -5], AbsTol=0.25);
             testCase.verifyGreaterThan(peakValue, 0.5);
         end
 
@@ -45,6 +45,21 @@ classdef LocalRegistrationEstimatorTest < matlab.unittest.TestCase
             result = estimator.estimate(source, source, focusedState, initialOtherState);
 
             testCase.verifyEqual(result.OutputSize, [95 127]);
+        end
+
+        function estimateHandlesNonSquareUint8Images(testCase)
+            imageData = uint8(255 * LocalRegistrationEstimatorTest.createTexture([311 997], 13));
+            source = anchor.MatrixImageSource(imageData, "Wide synthetic");
+            focusedState = anchor.ViewportState([420.5 580.5], [110.5 185.5]);
+            initialOtherState = focusedState.translate([9, -6]);
+            estimator = anchor.LocalRegistrationEstimator();
+
+            result = estimator.estimate(source, source, focusedState, initialOtherState);
+
+            testCase.verifyEqual(result.OutputSize, [75 160]);
+            testCase.verifyEqual(result.ImageShift, [-9 6], AbsTol=0.35);
+            testCase.verifyEqual(result.TargetViewportState.getCenter(), ...
+                focusedState.getCenter(), AbsTol=0.35);
         end
 
         function estimatePatchShiftReturnsZeroForFlatPatches(testCase)
